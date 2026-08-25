@@ -72,14 +72,43 @@ class Suppliers extends MY_Controller
 			$row[] = $suppliers->supplier_name;
 			$row[] = $suppliers->mobile;
 			$row[] = $suppliers->email;
-      		$row[] = (!empty($suppliers->total_purchase) && $suppliers->total_purchase != 0) ? app_number_format($suppliers->total_purchase) : (0);
-      		$row[] = (!empty($suppliers->total_paid) && $suppliers->total_paid != 0) ? app_number_format($suppliers->total_paid) : (0);
-      		$row[] = (!empty($suppliers->purchase_due) && $suppliers->purchase_due != 0) ? app_number_format($suppliers->purchase_due) : (0);
-      		$row[] = ($suppliers->purchase_return_due == null) ? (0) : app_number_format($suppliers->purchase_return_due);
-			if ((int) $suppliers->status === 1) {
-				$str = "<span onclick='update_status(" . $suppliers->id . ",0)' id='span_" . $suppliers->id . "'  class='label label-success' style='cursor:pointer'>Active </span>";
+			$row[] = (!empty($suppliers->purchase_due) && $suppliers->purchase_due != 0) ? app_number_format($suppliers->purchase_due) : (0);
+
+			$row[] = ($suppliers->purchase_return_due == null) ? (0) : app_number_format($suppliers->purchase_return_due);
+
+			// Calculate Total Due using correct accounting formula
+			// Total Due = Opening Balance Due + Purchase Due - Purchase Return Due
+			// Where:
+			// - Opening Balance Due = Opening Balance - Opening Balance Payments
+			// - Purchase Due = Total Purchases - Purchase Payments (already calculated in db_suppliers)
+			// - Purchase Return Due = Total Returns - Return Payments (already calculated in db_suppliers)
+
+			$opening_balance = (!empty($suppliers->opening_balance)) ? $suppliers->opening_balance : 0;
+			$purchase_due = (!empty($suppliers->purchase_due)) ? $suppliers->purchase_due : 0;
+			$purchase_return_due = (!empty($suppliers->purchase_return_due)) ? $suppliers->purchase_return_due : 0;
+
+			// Calculate opening balance due (Opening Balance - Opening Balance Payments)
+			$sum_of_ob_paid = $this->db->query("select coalesce(sum(payment),0) sum_of_ob_paid from db_sobpayments where supplier_id=" . $suppliers->id)->row()->sum_of_ob_paid;
+			$opening_balance_due = $opening_balance - $sum_of_ob_paid;
+
+			// Calculate total paid (Opening Balance Payments + Purchase Payments + Return Payments)
+			$total_purchase_paid = $this->db->query("select coalesce(sum(payment),0) total_paid from db_purchasepayments where purchase_id IN (select id from db_purchase where supplier_id=" . $suppliers->id . ")")->row()->total_paid;
+			$total_return_paid = $this->db->query("select coalesce(sum(payment),0) total_paid from db_purchasepaymentsreturn where return_id IN (select id from db_purchasereturn where supplier_id=" . $suppliers->id . ")")->row()->total_paid;
+			$total_paid = $sum_of_ob_paid + $total_purchase_paid + $total_return_paid;
+
+			// Total Due = Opening Balance Due + Purchase Due - Purchase Return Due
+			// (Purchase returns reduce the amount owed, so they're subtracted)
+			$total_due = $opening_balance_due + $purchase_due - $purchase_return_due;
+			$total_due = max(0, $total_due); // Ensure no negative values
+
+			$row[] = app_number_format($opening_balance_due);
+			$row[] = app_number_format($total_paid);
+			$row[] = app_number_format($total_due);
+
+			if ((int)$suppliers->status === 1) {
+				$str = "<span onclick='update_status(" . $suppliers->id . ",0)' id='span_" . $suppliers->id . "'  class='label label-success' style='cursor:pointer'>Active</span>";
 			} else {
-				$str = "<span onclick='update_status(" . $suppliers->id . ",1)' id='span_" . $suppliers->id . "'  class='label label-danger' style='cursor:pointer'> Inactive </span>";
+				$str = "<span onclick='update_status(" . $suppliers->id . ",1)' id='span_" . $suppliers->id . "'  class='label label-danger' style='cursor:pointer'>Inactive</span>";
 			}
 			$row[] = $str;
 			$str2 = '<div class="btn-group" title="View Account">
