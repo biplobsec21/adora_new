@@ -1,4 +1,5 @@
 .env
 node_modules/
 vendor/
-application/controllers/logs/
+application/cache/
+application/logs/
