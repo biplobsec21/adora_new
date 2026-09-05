@@ -77,7 +77,7 @@
                         <div id="bulk-payment-count" class="alert alert-info"></div>
                         <div class="form-group"><label>Payment Amount</label><select name="amount_mode" id="bulk-amount-mode" class="form-control">
                                 <option value="full_due">Pay each customer's full due</option>
-                                <option value="fixed_amount">Apply the same amount to each customer</option>
+                                <!-- <option value="fixed_amount">Apply the same amount to each customer</option> -->
                             </select></div>
                         <div class="form-group" id="bulk-fixed-amount-group" style="display:none;"><label>Amount per customer</label><input type="number" name="amount" class="form-control" min="0.01" step="0.01"></div>
                         <div class="form-group"><label>Payment Date</label><input type="date" name="payment_date" class="form-control" value="<?= date('Y-m-d'); ?>" required></div>
@@ -124,6 +124,55 @@
                 processing: true,
                 serverSide: true,
                 responsive: true,
+                pageLength: 50,
+                lengthMenu: [
+                    [50, 100, 250, -1],
+                    [50, 100, 250, 'All']
+                ],
+                dom: '<"row margin-bottom-12"<"col-sm-12"<"pull-left"l><"pull-right"fr><"pull-right margin-left-10"B>>>tip',
+                buttons: {
+                    buttons: [{
+                            extend: 'copy',
+                            className: 'btn bg-teal color-palette btn-flat',
+                            exportOptions: {
+                                columns: [1, 2, 3, 4, 5]
+                            }
+                        },
+                        {
+                            extend: 'excel',
+                            className: 'btn bg-teal color-palette btn-flat',
+                            exportOptions: {
+                                columns: [1, 2, 3, 4, 5]
+                            }
+                        },
+                        {
+                            extend: 'pdf',
+                            className: 'btn bg-teal color-palette btn-flat',
+                            exportOptions: {
+                                columns: [1, 2, 3, 4, 5]
+                            }
+                        },
+                        {
+                            extend: 'print',
+                            className: 'btn bg-teal color-palette btn-flat',
+                            exportOptions: {
+                                columns: [1, 2, 3, 4, 5]
+                            }
+                        },
+                        {
+                            extend: 'csv',
+                            className: 'btn bg-teal color-palette btn-flat',
+                            exportOptions: {
+                                columns: [1, 2, 3, 4, 5]
+                            }
+                        },
+                        {
+                            extend: 'colvis',
+                            className: 'btn bg-teal color-palette btn-flat',
+                            text: 'Columns'
+                        }
+                    ]
+                },
                 order: [],
                 ajax: {
                     url: '<?= $base_url; ?>payment_management/ajax_list',

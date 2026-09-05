@@ -53,6 +53,7 @@ class Payment_management_model extends CI_Model
         if ($search !== '') {
             $this->db->group_start()
                 ->like('c.customer_name', $search)
+                ->or_like('c.address', $search)
                 ->or_like('c.mobile', $search)
                 ->or_like('c.id', $search)
                 ->group_end();
