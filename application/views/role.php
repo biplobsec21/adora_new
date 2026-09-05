@@ -79,6 +79,52 @@ echo "<pre>";
                         </thead>
                         <tbody>
                           <?php $i = 1; ?>
+                          <!-- END OF DAY -->
+                          <tr>
+                            <td><?= $i++; ?></td>
+                            <td>End of Day</td>
+                            <td>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="change_me" id="eod"> <?= $this->lang->line('select_all'); ?>
+                                </label></div>
+                            </td>
+                            <td>
+                              <input type="hidden" name="module[eod]" value="on">
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="eod_view" name="permission[eod_view]"> View
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="eod_report" name="permission[eod_report]"> EOD report
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="eod_adjustment_view" name="permission[eod_adjustment_view]"> View cash adjustments
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="eod_adjustment_add" name="permission[eod_adjustment_add]"> Add cash adjustment
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="eod_close" name="permission[eod_close]"> Close day
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="eod_retroactive_close" name="permission[eod_retroactive_close]"> Retroactive close
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="eod_edit_closed_data" name="permission[eod_edit_closed_data]"> Edit closed data
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="eod_audit_view" name="permission[eod_audit_view]"> View change history
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="payment_management_view" name="permission[payment_management_view]"> Payment list
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="payment_management_record" name="permission[payment_management_record]"> Record manual payment
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_all" id="payment_management_status" name="permission[payment_management_status]"> Bulk/status actions
+                                </label></div>
+                            </td>
+                          </tr>
                           <!-- USERS -->
                           <tr>
                             <td><?= $i++; ?></td>
@@ -741,113 +787,6 @@ echo "<pre>";
                               <div class="checkbox icheck"><label>
                                   <input type="checkbox" class="database" id='database_backup' name="permission[database_backup]"> Add
                                 </label></div>
-
-                            </td>
-                          </tr>
-                          <!--- recipe and production -->
-                          <tr>
-                            <td><?= $i++; ?></td>
-                            <td>Recipe</td>
-                            <td>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="change_me" id="recipe"> <?= $this->lang->line('select_all'); ?>
-                                </label></div>
-                            </td>
-                            <td>
-                              <input type="hidden" name="module[recipe]" value="on">
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="recipe_all" id='recipe_add' name="permission[recipe_add]"> <?= $this->lang->line('add'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="recipe_all" id='recipe_edit' name="permission[recipe_edit]"> <?= $this->lang->line('edit'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="recipe_all" id='recipe_delete' name="permission[recipe_delete]"> <?= $this->lang->line('delete'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="recipe_all" id='recipe_view' name="permission[recipe_view]"> <?= $this->lang->line('view'); ?>
-                                </label></div>
-
-                            </td>
-                          </tr>
-
-                          <!-- Audit Log -->
-                          <tr>
-                            <td><?= $i++; ?></td>
-                            <td>Audit Log</td>
-                            <td>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="change_me" id="audit_log"> <?= $this->lang->line('select_all'); ?>
-                                </label></div>
-                            </td>
-                            <td>
-                              <input type="hidden" name="module[audit_log]" value="on">
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="audit_log_all" id='audit_log_view' name="permission[audit_log_view]"> <?= $this->lang->line('view'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="audit_log_all" id='audit_log_export' name="permission[audit_log_export]"> Export
-                                </label></div>
-                            </td>
-                          </tr>
-
-                          <!-- Damage Management -->
-                          <tr>
-                            <td><?= $i++; ?></td>
-                            <td>Damage Management</td>
-                            <td>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="change_me" id="damage"> <?= $this->lang->line('select_all'); ?>
-                                </label></div>
-                            </td>
-                            <td>
-                              <input type="hidden" name="module[damage]" value="on">
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="damage_all" id='damage_add' name="permission[damage_add]"> <?= $this->lang->line('add'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="damage_all" id='damage_edit' name="permission[damage_edit]"> <?= $this->lang->line('edit'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="damage_all" id='damage_delete' name="permission[damage_delete]"> <?= $this->lang->line('delete'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="damage_all" id='damage_view' name="permission[damage_view]"> <?= $this->lang->line('view'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="damage_all" id='damage_approve' name="permission[damage_approve]"> Approve
-                                </label></div>
-                            </td>
-                          </tr>
-
-                          <tr>
-                            <td><?= $i++; ?></td>
-                            <td>Production</td>
-                            <td>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="change_me" id="production"> <?= $this->lang->line('select_all'); ?>
-                                </label></div>
-                            </td>
-                            <td>
-                              <input type="hidden" name="module[production]" value="on">
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="production_all" id='production_add' name="permission[production_add]"> <?= $this->lang->line('add'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="production_all" id='production_edit' name="permission[production_edit]"> <?= $this->lang->line('edit'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="production_all" id='production_delete' name="permission[production_delete]"> <?= $this->lang->line('delete'); ?>
-                                </label></div>
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="production_all" id='production_view' name="permission[production_view]"> <?= $this->lang->line('view'); ?>
-                                </label></div>
-
-                              <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="production_all" id='production_approve' name="permission[production_approve]"> Approve
-                                </label></div>
-
-
 
                             </td>
                           </tr>

@@ -1,5 +1,9 @@
 .env
 node_modules/
 vendor/
+<<<<<<< HEAD
 application/cache/
 application/logs/
+=======
+application/logs/*.php
+>>>>>>> 06452df (EOD and payment management feature updated)

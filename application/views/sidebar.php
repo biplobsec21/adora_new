@@ -179,6 +179,12 @@ $CI = &get_instance();
     <ul class="sidebar-menu">
       <!--<li class="header">MAIN NAVIGATION</li>-->
       <li class="dashboard-active-li "><a href="<?php echo $base_url; ?>dashboard"><i class="fa fa-dashboard text-aqua"></i> <span><?= $this->lang->line('dashboard'); ?></span></a></li>
+      <?php if ($CI->permissions('eod_view')) { ?>
+        <li class="eod-active-li"><a href="<?php echo $base_url; ?>eod"><i class="fa fa-calendar-check-o text-aqua"></i> <span>End of Day</span></a></li>
+      <?php } ?>
+      <?php if ($CI->permissions('payment_management_view')) { ?>
+        <li class="payment-management-active-li"><a href="<?php echo $base_url; ?>payment_management"><i class="fa fa-money text-aqua"></i> <span>Payment Management</span></a></li>
+      <?php } ?>
 
 
       <!--<li class="header">SALES</li>-->
@@ -447,8 +453,8 @@ $CI = &get_instance();
 
 
       <!--<li class="header">REPORTS</li>-->
-      <?php if ($CI->permissions('item_purchase_report') || $CI->permissions('sales_report') || $CI->permissions('item_sales_report') || $CI->permissions('purchase_report') || $CI->permissions('purchase_return_report') || $CI->permissions('expense_report') || $CI->permissions('profit_report') || $CI->permissions('stock_report') || $CI->permissions('purchase_payments_report') || $CI->permissions('sales_payments_report') || $CI->permissions('expired_items_report')) { ?>
-        <li class="report-sales-active-li report-sales-return-active-li report-purchase-active-li report-purchase-return-active-li report-expense-active-li report-profit-loss-active-li report-stock-active-li report-purchase-payments-active-li report-sales-item-active-li report-sales-payments-active-li report-expired-items-active-li report-purchase-item-active-li treeview">
+      <?php if ($CI->permissions('item_purchase_report') || $CI->permissions('sales_report') || $CI->permissions('item_sales_report') || $CI->permissions('purchase_report') || $CI->permissions('purchase_return_report') || $CI->permissions('expense_report') || $CI->permissions('profit_report') || $CI->permissions('stock_report') || $CI->permissions('purchase_payments_report') || $CI->permissions('sales_payments_report') || $CI->permissions('expired_items_report') || $CI->permissions('eod_report')) { ?>
+        <li class="eod-report-active-li report-sales-active-li report-sales-return-active-li report-purchase-active-li report-purchase-return-active-li report-expense-active-li report-profit-loss-active-li report-stock-active-li report-purchase-payments-active-li report-sales-item-active-li report-sales-payments-active-li report-expired-items-active-li report-purchase-item-active-li treeview">
           <a href="#">
             <i class="fa fa-bar-chart text-aqua"></i> <span><?= $this->lang->line('reports'); ?></span>
             <span class="pull-right-container">
@@ -456,6 +462,10 @@ $CI = &get_instance();
             </span>
           </a>
           <ul class="treeview-menu">
+
+            <?php if ($CI->permissions('eod_report')) { ?>
+              <li class="eod-report-active-li"><a href="<?php echo $base_url; ?>eod/report"><i class="fa fa-files-o "></i> <span>EOD Report</span></a></li>
+            <?php } ?>
 
             <?php if ($CI->permissions('profit_report')) { ?>
               <li class="report-profit-loss-active-li"><a href="<?php echo $base_url; ?>reports/profit_loss"><i class="fa fa-files-o "></i> <span><?= $this->lang->line('profit_and_loss_report'); ?></span></a></li>
