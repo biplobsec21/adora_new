@@ -2,8 +2,13 @@
 node_modules/
 vendor/
 <<<<<<< HEAD
+<<<<<<< HEAD
 application/cache/
 application/logs/
 =======
 application/logs/*.php
 >>>>>>> 06452df (EOD and payment management feature updated)
+=======
+application/logs/*.php
+application/cache/sessions/*.php
+>>>>>>> 9194256 (Side bar hide)

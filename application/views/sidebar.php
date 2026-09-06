@@ -179,12 +179,7 @@ $CI = &get_instance();
     <ul class="sidebar-menu">
       <!--<li class="header">MAIN NAVIGATION</li>-->
       <li class="dashboard-active-li "><a href="<?php echo $base_url; ?>dashboard"><i class="fa fa-dashboard text-aqua"></i> <span><?= $this->lang->line('dashboard'); ?></span></a></li>
-      <?php if ($CI->permissions('eod_view')) { ?>
-        <li class="eod-active-li"><a href="<?php echo $base_url; ?>eod"><i class="fa fa-calendar-check-o text-aqua"></i> <span>End of Day</span></a></li>
-      <?php } ?>
-      <?php if ($CI->permissions('payment_management_view')) { ?>
-        <li class="payment-management-active-li"><a href="<?php echo $base_url; ?>payment_management"><i class="fa fa-money text-aqua"></i> <span>Payment Management</span></a></li>
-      <?php } ?>
+
 
 
       <!--<li class="header">SALES</li>-->
