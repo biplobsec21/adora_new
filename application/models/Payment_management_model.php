@@ -4,6 +4,19 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Payment_management_model extends CI_Model
 {
+    public function get_customer_addresses()
+    {
+        return $this->db
+            ->distinct()
+            ->select('c.address')
+            ->from('db_customers AS c')
+            ->where('c.status', 1)
+            ->where("TRIM(COALESCE(c.address, '')) <>", '')
+            ->order_by('c.address', 'ASC')
+            ->get()
+            ->result();
+    }
+
     public function get_datatables()
     {
         $this->build_list_query();
@@ -27,9 +40,15 @@ class Payment_management_model extends CI_Model
         return $this->db->get()->num_rows();
     }
 
-    private function build_list_query()
+    public function get_due_customers_for_export($address = '')
     {
-        $this->db->select("c.id AS customer_id, c.customer_name, c.address, c.mobile,
+        $this->build_list_query($address);
+        return $this->db->get()->result();
+    }
+
+    private function build_list_query($address = '')
+    {
+        $this->db->select("c.id AS customer_id, c.customer_code, c.customer_number, c.customer_name, c.address, c.mobile,
                         COALESCE(c.opening_balance, 0) AS opening_balance,
                         COALESCE(ob.paid_amount, 0) AS opening_balance_paid,
                         COALESCE(sales.expected_amount, 0) AS expected_amount,
@@ -49,7 +68,12 @@ class Payment_management_model extends CI_Model
             ->where('c.status', 1)
             ->having('remaining_amount >', 0);
 
-        $search = trim((string) $this->input->post('search')['value']);
+        if ($address !== '') {
+            $this->db->where('c.address', $address);
+        }
+
+        $search_data = $this->input->post('search');
+        $search = trim((string) (is_array($search_data) && isset($search_data['value']) ? $search_data['value'] : ''));
         if ($search !== '') {
             $this->db->group_start()
                 ->like('c.customer_name', $search)

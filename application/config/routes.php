@@ -1,5 +1,5 @@
 <?php
-defined('BASEPATH') OR exit('No direct script access allowed');
+defined('BASEPATH') or exit('No direct script access allowed');
 
 /*
 | -------------------------------------------------------------------------
@@ -60,3 +60,4 @@ $route['damage'] = 'damage';
 $route['damage/add'] = 'damage/add';
 $route['damage/save'] = 'damage/save';
 $route['damage/approve/(:num)'] = 'damage/approve/$1';
+$route['ll/(:any)'] = 'sms_public/ledger/$1';

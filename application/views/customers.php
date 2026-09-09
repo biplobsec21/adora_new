@@ -17,7 +17,7 @@
     if (!isset($customer_name)) {
       $customer_name = $mobile = $phone = $email = $country_id = $state_id = $city =
         $postcode = $address = $gstin = $tax_number =
-        $state_code = $customer_code = $opening_balance = '';
+        $state_code = $customer_code = $customer_number = $opening_balance = '';
     }
     ?>
 
@@ -65,6 +65,14 @@
                       </div>
 
 
+
+                      <div class="form-group">
+                        <label for="customer_number" class="col-sm-4 control-label">Customer Number</label>
+                        <div class="col-sm-8">
+                          <input type="text" class="form-control" id="customer_number" name="customer_number" placeholder="N/A" value="<?php echo html_escape($customer_number); ?>">
+                          <span id="customer_number_msg" style="display:none" class="text-danger"></span>
+                        </div>
+                      </div>
 
                       <div class="form-group">
                         <label for="mobile" class="col-sm-4 control-label"><?= $this->lang->line('mobile'); ?></label>

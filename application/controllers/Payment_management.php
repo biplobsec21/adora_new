@@ -16,6 +16,7 @@ class Payment_management extends MY_Controller
         $this->permission_check('payment_management_view');
         $data = $this->data;
         $data['page_title'] = 'Payment Management';
+        $data['customer_addresses'] = $this->payments->get_customer_addresses();
         $this->load->view('payment-management/list', $data);
     }
 
@@ -51,6 +52,35 @@ class Payment_management extends MY_Controller
             'recordsFiltered' => $this->payments->count_filtered(),
             'data' => $data,
         ));
+    }
+
+    public function export_due_customers()
+    {
+        $this->permission_check('payment_management_view');
+        $address = (string) $this->input->get('address', true);
+        $customers = $this->payments->get_due_customers_for_export($address);
+
+        $filename_address = $address !== '' ? trim(preg_replace('/[^A-Za-z0-9 _-]/', '', $address)) : 'all';
+        $filename_address = $filename_address !== '' ? preg_replace('/\s+/', ' ', $filename_address) : 'all';
+        $filename = date('F,Y') . '-' . $filename_address . '.csv';
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        $output = fopen('php://output', 'w');
+        fputcsv($output, array('Customer Number', 'Customer ID', 'Customer Name', 'Address', 'Due Amount'));
+        foreach ($customers as $customer) {
+            fputcsv($output, array(
+                $customer->customer_number,
+                $customer->customer_code,
+                $customer->customer_name,
+                $customer->address,
+                $customer->remaining_amount,
+            ));
+        }
+        fclose($output);
+        exit;
     }
 
     public function record_payment()

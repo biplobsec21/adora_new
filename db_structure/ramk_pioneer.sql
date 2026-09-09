@@ -170,6 +170,7 @@ CREATE TABLE `db_currency` (
 CREATE TABLE `db_customers` (
   `id` int(50) NOT NULL,
   `customer_code` varchar(20) DEFAULT NULL,
+  `customer_number` varchar(50) NOT NULL DEFAULT 'N/A',
   `customer_name` varchar(50) DEFAULT NULL,
   `mobile` varchar(15) DEFAULT NULL,
   `phone` varchar(15) DEFAULT NULL,

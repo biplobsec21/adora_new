@@ -179,7 +179,30 @@ $CI = &get_instance();
     <ul class="sidebar-menu">
       <!--<li class="header">MAIN NAVIGATION</li>-->
       <li class="dashboard-active-li "><a href="<?php echo $base_url; ?>dashboard"><i class="fa fa-dashboard text-aqua"></i> <span><?= $this->lang->line('dashboard'); ?></span></a></li>
-
+      <?php if ($CI->permissions('eod_view') || $CI->permissions('payment_management_view')) { ?>
+        <li class="payment-management-group-active-li treeview">
+          <a href="#">
+            <i class="fa fa-money text-aqua"></i> <span>Payment Management</span>
+            <span class="pull-right-container">
+              <i class="fa fa-angle-left pull-right"></i>
+            </span>
+          </a>
+          <ul class="treeview-menu">
+            <?php if ($CI->permissions('eod_view')) { ?>
+              <li class="eod-active-li"><a href="<?php echo $base_url; ?>eod"><i class="fa fa-calendar-check-o"></i> <span>EOD Collections</span></a></li>
+            <?php } ?>
+            <?php if ($CI->permissions('payment_management_view')) { ?>
+              <li class="payment-management-active-li"><a href="<?php echo $base_url; ?>payment_management"><i class="fa fa-money"></i> <span>Payment Due</span></a></li>
+            <?php } ?>
+            <?php if ($CI->permissions('payment_management_view')) { ?>
+              <li class="due-generation-active-li"><a href="<?php echo $base_url; ?>due_generation"><i class="fa fa-magic"></i> <span>Canteen Due Generation</span></a></li>
+              <li class="cost-cutting-active-li"><a href="<?php echo $base_url; ?>cost_cutting"><i class="fa fa-upload"></i> <span>Canteen Cost Cutting</span></a></li>
+              <li class="canteen-audit-active-li"><a href="<?php echo $base_url; ?>canteen_audit"><i class="fa fa-history"></i> <span>Canteen Audit History</span></a></li>
+              <?php if ($CI->permissions('sms_api_view')) { ?><li class="sms-management-active-li"><a href="<?php echo $base_url; ?>sms_management"><i class="fa fa-commenting"></i> <span>SMS Management</span></a></li><?php } ?>
+            <?php } ?>
+          </ul>
+        </li>
+      <?php } ?>
 
 
       <!--<li class="header">SALES</li>-->
@@ -216,8 +239,8 @@ $CI = &get_instance();
       <?php } ?>
 
       <!--<li class="header">CUSTOMERS</li>-->
-      <?php if ($CI->permissions('customers_add') || $CI->permissions('customers_view') || $CI->permissions('import_customers')) { ?>
-        <li class="customers-view-active-li customers-active-li import_customers-active-li treeview">
+      <?php if ($CI->permissions('customers_add') || $CI->permissions('customers_view') || $CI->permissions('customers_edit') || $CI->permissions('import_customers')) { ?>
+        <li class="customers-view-active-li customers-active-li import_customers-active-li customer-number-migration-active-li treeview">
           <a href="#">
             <i class="fa fa-group text-aqua"></i> <span><?= $this->lang->line('customers'); ?></span>
             <span class="pull-right-container">
@@ -234,6 +257,9 @@ $CI = &get_instance();
 
             <?php if ($CI->permissions('import_customers')) { ?>
               <li class="import_customers-active-li"><a href="<?php echo $base_url; ?>import/customers"><i class="fa fa-arrow-circle-o-left "></i> <span><?= $this->lang->line('import_customers'); ?></span></a></li>
+            <?php } ?>
+            <?php if ($CI->permissions('customers_edit')) { ?>
+              <li class="customer-number-migration-active-li"><a href="<?php echo $base_url; ?>customer_number_migration"><i class="fa fa-magic"></i> <span>Customer Number Migration</span></a></li>
             <?php } ?>
 
           </ul>
@@ -596,4 +622,29 @@ $CI = &get_instance();
     </ul>
   </section>
   <!-- /.sidebar -->
+  <script>
+    (function() {
+      var path = window.location.pathname;
+      var activeClass = '';
+
+      if (/\/payment_management(?:\/|$)/.test(path)) {
+        activeClass = 'payment-management-active-li';
+      } else if (/\/eod(?:\/|$)/.test(path)) {
+        activeClass = 'eod-active-li';
+      } else if (/\/cost_cutting(?:\/|$)/.test(path)) {
+        activeClass = 'cost-cutting-active-li';
+      } else if (/\/due_generation(?:\/|$)/.test(path)) {
+        activeClass = 'due-generation-active-li';
+      } else if (/\/canteen_audit(?:\/|$)/.test(path)) {
+        activeClass = 'canteen-audit-active-li';
+      } else if (/\/sms_management(?:\/|$)/.test(path)) {
+        activeClass = 'sms-management-active-li';
+      }
+
+      if (activeClass !== '') {
+        $('.' + activeClass).addClass('active');
+        $('.payment-management-group-active-li').addClass('active');
+      }
+    }());
+  </script>
 </aside>

@@ -6,8 +6,8 @@ class Customers_model extends CI_Model
 
 	//Datatable start
 	var $table = 'db_customers as a';
-	var $column_order = array('a.customer_code', 'a.id', 'a.customer_name', 'a.mobile', 'a.address', 'a.opening_balance', 'a.status', 'a.sales_due', 'a.sales_return_due'); //set column field database for datatable orderable
-	var $column_search = array('a.customer_code', 'a.id', 'a.customer_name', 'a.mobile', 'a.address', 'a.opening_balance', 'a.status', 'a.sales_due', 'a.sales_return_due'); //set column field database for datatable searchable 
+	var $column_order = array('a.customer_code', 'a.customer_number', 'a.id', 'a.customer_name', 'a.mobile', 'a.address', 'a.opening_balance', 'a.status', 'a.sales_due', 'a.sales_return_due'); //set column field database for datatable orderable
+	var $column_search = array('a.customer_code', 'a.customer_number', 'a.id', 'a.customer_name', 'a.mobile', 'a.address', 'a.opening_balance', 'a.status', 'a.sales_due', 'a.sales_return_due'); //set column field database for datatable searchable 
 	var $order = array('a.id' => 'desc'); // default order 
 
 	public function __construct()
@@ -235,11 +235,13 @@ class Customers_model extends CI_Model
 		$customer_code = $customer_init . str_pad($maxid, 4, '0', STR_PAD_LEFT);
 		//end
 
-		$query1 = "insert into db_customers(customer_code,customer_name,mobile,phone,email,
+		$customer_number = trim((string) $customer_number) !== '' ? $customer_number : 'N/A';
+
+		$query1 = "insert into db_customers(customer_code,customer_number,customer_name,mobile,phone,email,
 											country_id,state_id,city,postcode,address,opening_balance,
 											system_ip,system_name,
 											created_date,created_time,created_by,status,gstin,tax_number)
-											values('$customer_code','$customer_name','$mobile','$phone','$email',
+											values('$customer_code','$customer_number','$customer_name','$mobile','$phone','$email',
 											'$country',$state,'$city','$postcode','$address','$opening_balance',
 											'$SYSTEM_IP','$SYSTEM_NAME',
 											'$CUR_DATE','$CUR_TIME','$CUR_USERNAME',1,'$gstin','$tax_number')";
@@ -264,6 +266,7 @@ class Customers_model extends CI_Model
 			$query = $query->row();
 			$data['q_id'] = $query->id;
 			$data['customer_name'] = $query->customer_name;
+			$data['customer_number'] = $query->customer_number;
 			$data['mobile'] = $query->mobile;
 			$data['phone'] = $query->phone;
 			$data['email'] = $query->email;
@@ -292,7 +295,9 @@ class Customers_model extends CI_Model
 
 		$state = (!empty($state)) ? $state : 'NULL';
 
-		$query1 = "update db_customers set customer_name='$customer_name',mobile='$mobile',phone='$phone',
+		$customer_number = trim((string) $customer_number) !== '' ? $customer_number : 'N/A';
+
+		$query1 = "update db_customers set customer_name='$customer_name',customer_number='$customer_number',mobile='$mobile',phone='$phone',
 						email='$email',country_id='$country',state_id=$state,city='$city',
 						opening_balance='$opening_balance',
 						postcode='$postcode',address='$address',gstin='$gstin',tax_number='$tax_number'

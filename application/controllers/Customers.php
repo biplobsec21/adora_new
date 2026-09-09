@@ -88,6 +88,7 @@ class Customers extends MY_Controller
 			}
 
 			$row[] = $customers->customer_code;
+			$row[] = html_escape($customers->customer_number);
 			$row[] = $customers->customer_name;
 			$row[] = $customers->mobile;
 			$row[] = $customers->address;

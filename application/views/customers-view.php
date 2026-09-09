@@ -115,13 +115,14 @@
                         <input type="checkbox" class="group_check checkbox">
                       </th>
                       <th><?= $this->lang->line('customer_id'); ?></th>
+                      <th>Customer Number</th>
                       <th><?= $this->lang->line('customer_name'); ?></th>
                       <th><?= $this->lang->line('mobile'); ?></th>
                       <th><?= $this->lang->line('address'); ?></th>
                       <th><?= $this->lang->line('total_paid'); ?>(-)</th>
                       <th><?= $this->lang->line('sales_due'); ?>(-)</th>
                       <th><?= $this->lang->line('sales_return_due'); ?>(+)</th>
-                      <th><?= 'Total Due' ?>
+                      <th><?= 'Total Due' ?></th>
 
                       <th><?= $this->lang->line('status'); ?></th>
                       <th><?= $this->lang->line('action'); ?></th>
@@ -132,7 +133,7 @@
                   </tbody>
                   <tfoot>
                     <tr class="bg-gray">
-                      <th colspan="5" style="text-align:right">Total</th>
+                      <th colspan="6" style="text-align:right">Total</th>
                       <th></th>
                       <th></th>
                       <th></th>
@@ -200,35 +201,35 @@
               extend: 'copy',
               className: 'btn bg-teal color-palette btn-flat',
               exportOptions: {
-                columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
               }
             },
             {
               extend: 'excel',
               className: 'btn bg-teal color-palette btn-flat',
               exportOptions: {
-                columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
               }
             },
             {
               extend: 'pdf',
               className: 'btn bg-teal color-palette btn-flat',
               exportOptions: {
-                columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
               }
             },
             {
               extend: 'print',
               className: 'btn bg-teal color-palette btn-flat',
               exportOptions: {
-                columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
               }
             },
             {
               extend: 'csv',
               className: 'btn bg-teal color-palette btn-flat',
               exportOptions: {
-                columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                columns: [1, 2, 3, 4, 5, 6, 7, 8, 9]
               }
             },
             {
@@ -275,7 +276,7 @@
         },
 
         "columnDefs": [{
-            "targets": [0, 10], // Updated: was 9, now 10 because of new column
+            "targets": [0, 11],
             "orderable": false,
           },
           {
@@ -295,14 +296,6 @@
               i : 0;
           };
           var invoice_total = api
-            .column(5, {
-              page: 'none'
-            })
-            .data()
-            .reduce(function(a, b) {
-              return intVal(a) + intVal(b);
-            }, 0);
-          var sales_due = api
             .column(6, {
               page: 'none'
             })
@@ -310,7 +303,7 @@
             .reduce(function(a, b) {
               return intVal(a) + intVal(b);
             }, 0);
-          var sales_return_due = api
+          var sales_due = api
             .column(7, {
               page: 'none'
             })
@@ -318,7 +311,7 @@
             .reduce(function(a, b) {
               return intVal(a) + intVal(b);
             }, 0);
-          var total = api
+          var sales_return_due = api
             .column(8, {
               page: 'none'
             })
@@ -326,10 +319,18 @@
             .reduce(function(a, b) {
               return intVal(a) + intVal(b);
             }, 0);
-          $(api.column(5).footer()).html(app_number_format(invoice_total));
-          $(api.column(6).footer()).html(app_number_format(sales_due));
-          $(api.column(7).footer()).html(app_number_format(sales_return_due));
-          $(api.column(8).footer()).html(app_number_format(total));
+          var total = api
+            .column(9, {
+              page: 'none'
+            })
+            .data()
+            .reduce(function(a, b) {
+              return intVal(a) + intVal(b);
+            }, 0);
+          $(api.column(6).footer()).html(app_number_format(invoice_total));
+          $(api.column(7).footer()).html(app_number_format(sales_due));
+          $(api.column(8).footer()).html(app_number_format(sales_return_due));
+          $(api.column(9).footer()).html(app_number_format(total));
         },
         /*End Footer Total*/
       });
