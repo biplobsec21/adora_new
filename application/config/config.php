@@ -50,7 +50,7 @@ $config['base_url'] .= str_replace(basename($_SERVER['SCRIPT_NAME']), "", $_SERV
 $config['index_page'] = 'index.php';
 
 // EOD starts from this date; activity before it is legacy history.
-$config['eod_start_date'] = '2026-09-03';
+$config['eod_start_date'] = '2026-09-10';
 
 /*
 |--------------------------------------------------------------------------
