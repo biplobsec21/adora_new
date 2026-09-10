@@ -24,19 +24,19 @@ defined('BASEPATH') or exit('No direct script access allowed');
 |
 */
 //$config['base_url'] = 'http://pos.local:8888/';
-$forwarded_host = isset($_SERVER['HTTP_X_FORWARDED_HOST']) ? trim((string) $_SERVER['HTTP_X_FORWARDED_HOST']) : '';
-$forwarded_proto = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) ? trim((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) : '';
-$request_host = $forwarded_host !== '' ? trim(explode(',', $forwarded_host)[0]) : $_SERVER['HTTP_HOST'];
-$request_proto = in_array($forwarded_proto, array('http', 'https'), true)
-    ? $forwarded_proto
-    : ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == "on") ? "https" : "http");
-$config['base_url'] = $request_proto . "://" . $request_host;
-$config['base_url'] .= str_replace(basename($_SERVER['SCRIPT_NAME']), "", $_SERVER['SCRIPT_NAME']);
-
-
-// $config['base_url'] = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == "on") ? "https" : "http");
-// $config['base_url'] .= "://" . $_SERVER['HTTP_HOST'];
+// $forwarded_host = isset($_SERVER['HTTP_X_FORWARDED_HOST']) ? trim((string) $_SERVER['HTTP_X_FORWARDED_HOST']) : '';
+// $forwarded_proto = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) ? trim((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) : '';
+// $request_host = $forwarded_host !== '' ? trim(explode(',', $forwarded_host)[0]) : $_SERVER['HTTP_HOST'];
+// $request_proto = in_array($forwarded_proto, array('http', 'https'), true)
+//     ? $forwarded_proto
+//     : ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == "on") ? "https" : "http");
+// $config['base_url'] = $request_proto . "://" . $request_host;
 // $config['base_url'] .= str_replace(basename($_SERVER['SCRIPT_NAME']), "", $_SERVER['SCRIPT_NAME']);
+
+
+$config['base_url'] = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == "on") ? "https" : "http");
+$config['base_url'] .= "://" . $_SERVER['HTTP_HOST'];
+$config['base_url'] .= str_replace(basename($_SERVER['SCRIPT_NAME']), "", $_SERVER['SCRIPT_NAME']);
 /*
 |--------------------------------------------------------------------------
 | Index File
