@@ -18,17 +18,21 @@
                 <div class="box box-success">
                     <div class="box-header with-border">
                         <h3 class="box-title"><?= $opening_required ? 'Start Initial Due Setup' : 'Start Monthly Due Generation'; ?></h3>
-                        <div class="box-tools"><a href="<?= $base_url; ?>site#tab_4" class="btn btn-default btn-sm"><i class="fa fa-cog"></i> Due Generation Settings</a></div>
+                        <?php if ($CI->permissions('site_edit')) { ?>
+                            <div class="box-tools"><a href="<?= $base_url; ?>site#tab_4" class="btn btn-default btn-sm"><i class="fa fa-cog"></i> Due Generation Settings</a></div>
+                        <?php } ?>
                     </div>
-                    <form method="post" action="<?= $base_url; ?>due_generation/generate" id="dueflow-generation-form"><input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
-                        <div class="box-body">
-                            <div class="form-group" style="max-width:420px;"><label for="generation_month"><?= $opening_required ? 'Initial Due Setup Month' : 'Due Generation Month'; ?></label><input type="month" id="generation_month" name="generation_month" class="form-control" min="<?= html_escape($available_generation_month); ?>" max="<?= html_escape($available_generation_month); ?>" value="<?= html_escape($default_generation_month); ?>" required>
-                                <p class="help-block"><?php if ($opening_required) { ?>The initial setup uses each customer's current outstanding due. No historical billing period is calculated.<?php } else { ?>Cost Cutting Date: <strong>day <?= (int) $settings->cost_cutting_day; ?></strong>.<?php } ?></p>
-                                <div id="dueflow-generation-message" class="alert alert-warning" style="display:none;margin-bottom:0;"></div>
+                    <?php if ($CI->permissions('payment_management_record')) { ?>
+                        <form method="post" action="<?= $base_url; ?>due_generation/generate" id="dueflow-generation-form"><input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
+                            <div class="box-body">
+                                <div class="form-group" style="max-width:420px;"><label for="generation_month"><?= $opening_required ? 'Initial Due Setup Month' : 'Due Generation Month'; ?></label><input type="month" id="generation_month" name="generation_month" class="form-control" min="<?= html_escape($available_generation_month); ?>" max="<?= html_escape($available_generation_month); ?>" value="<?= html_escape($default_generation_month); ?>" required>
+                                    <p class="help-block"><?php if ($opening_required) { ?>The initial setup uses each customer's current outstanding due. No historical billing period is calculated.<?php } else { ?>Cost Cutting Date: <strong>day <?= (int) $settings->cost_cutting_day; ?></strong>.<?php } ?></p>
+                                    <div id="dueflow-generation-message" class="alert alert-warning" style="display:none;margin-bottom:0;"></div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="box-footer"><button type="submit" id="generate-dueflow-button" class="btn btn-success"><i class="fa fa-magic"></i> Generate DueFlow</button></div>
-                    </form>
+                            <div class="box-footer"><button type="submit" id="generate-dueflow-button" class="btn btn-success"><i class="fa fa-magic"></i> Generate DueFlow</button></div>
+                        </form>
+                    <?php } ?>
                 </div>
                 <div class="box box-primary">
                     <div class="box-header with-border">

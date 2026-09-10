@@ -123,13 +123,13 @@ class Eod_model extends CI_Model
                          LIMIT {$per_page} OFFSET {$offset}";
         } elseif ($type === 'sales_due') {
             $from = 'db_sales';
-            $where = "sales_date = ? AND sales_status = 'Final' AND status = 1";
+            $where = "sales_date = ? AND sales_status = 'Final' AND status = 1 AND COALESCE(grand_total, 0) > COALESCE(paid_amount, 0)";
             $params = array($closing_date);
             $count_sql = "SELECT COUNT(*) AS total FROM {$from} WHERE {$where}";
-            $total_sql = "SELECT COALESCE(SUM(GREATEST(COALESCE(grand_total, 0) - COALESCE(paid_amount, 0), 0)), 0) AS total_amount FROM {$from} WHERE {$where}";
+            $total_sql = "SELECT COALESCE(SUM(COALESCE(grand_total, 0) - COALESCE(paid_amount, 0)), 0) AS total_amount FROM {$from} WHERE {$where}";
             $data_sql = "SELECT id, sales_code, sales_date AS transaction_date,
                                 customer_id, grand_total, paid_amount,
-                                GREATEST(COALESCE(grand_total, 0) - COALESCE(paid_amount, 0), 0) AS amount,
+                                COALESCE(grand_total, 0) - COALESCE(paid_amount, 0) AS amount,
                                 payment_status, created_by
                          FROM {$from}
                          WHERE {$where}

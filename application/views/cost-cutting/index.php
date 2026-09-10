@@ -20,27 +20,31 @@
                 <div class="box box-primary">
                     <div class="box-header with-border">
                         <h3 class="box-title">Upload Back Office Cutting File</h3>
-                        <div class="box-tools"><a href="<?= $base_url; ?>due_generation" class="btn btn-success btn-sm"><i class="fa fa-magic"></i> Open Canteen Due Generation</a></div>
+                        <?php if ($CI->permissions('payment_management_record')) { ?>
+                            <div class="box-tools"><a href="<?= $base_url; ?>due_generation" class="btn btn-success btn-sm"><i class="fa fa-magic"></i> Open Canteen Due Generation</a></div>
+                        <?php } ?>
                     </div>
-                    <form method="post" action="<?= $base_url; ?>cost_cutting/upload" enctype="multipart/form-data">
-                        <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
-                        <div class="box-body">
-                            <div class="form-group col-md-4">
-                                <label for="payment_period">Payment Period</label>
-                                <input type="month" id="payment_period" name="payment_period" class="form-control" value="<?= date('Y-m'); ?>" required>
+                    <?php if ($CI->permissions('payment_management_record')) { ?>
+                        <form method="post" action="<?= $base_url; ?>cost_cutting/upload" enctype="multipart/form-data">
+                            <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
+                            <div class="box-body">
+                                <div class="form-group col-md-4">
+                                    <label for="payment_period">Payment Period</label>
+                                    <input type="month" id="payment_period" name="payment_period" class="form-control" value="<?= date('Y-m'); ?>" required>
+                                </div>
+                                <div class="form-group col-md-8">
+                                    <label for="cutting_file">CSV File</label>
+                                    <input type="file" id="cutting_file" name="cutting_file" class="form-control" accept=".csv,text/csv" required>
+                                    <p class="help-block">Required columns: Customer Number, Cutting Amount. Customer Name is optional. Customers with N/A numbers must be handled manually from the customer panel.</p>
+                                    <a href="<?= $base_url; ?>cost_cutting/download_example" class="btn btn-default"><i class="fa fa-download"></i> Download Example CSV</a>
+                                </div>
+                                <div class="clearfix"></div>
                             </div>
-                            <div class="form-group col-md-8">
-                                <label for="cutting_file">CSV File</label>
-                                <input type="file" id="cutting_file" name="cutting_file" class="form-control" accept=".csv,text/csv" required>
-                                <p class="help-block">Required columns: Customer Number, Cutting Amount. Customer Name is optional. Customers with N/A numbers must be handled manually from the customer panel.</p>
-                                <a href="<?= $base_url; ?>cost_cutting/download_example" class="btn btn-default"><i class="fa fa-download"></i> Download Example CSV</a>
+                            <div class="box-footer">
+                                <button type="submit" class="btn btn-primary"><i class="fa fa-upload"></i> Upload &amp; Review</button>
                             </div>
-                            <div class="clearfix"></div>
-                        </div>
-                        <div class="box-footer">
-                            <button type="submit" class="btn btn-primary"><i class="fa fa-upload"></i> Upload &amp; Review</button>
-                        </div>
-                    </form>
+                        </form>
+                    <?php } ?>
                 </div>
             </section>
             <section class="content">
@@ -79,7 +83,7 @@
                                         <?php $status_class = $batch->status === 'Completed' ? 'success' : ($batch->status === 'Uploaded' || $batch->status === 'Failed' ? 'danger' : 'warning'); ?>
                                         <td><span class="label label-<?= $status_class; ?>"><?= html_escape($batch->status); ?></span></td>
                                         <td><?= html_escape($batch->processed_at ?: '-'); ?></td>
-                                        <td><?php if ($CI->permissions('send_sms') && $sms_settings->enabled && $sms_settings->cost_cutting_enabled) { ?><button type="button" class="btn btn-xs btn-success preview-costcutting-sms" data-id="<?= (int) $batch->id; ?>"><i class="fa fa-commenting"></i> Send SMS</button><?php } ?></td>
+                                        <td><?php if ($CI->permissions('send_sms') && $sms_settings->enabled && $sms_settings->cost_cutting_enabled && $batch->status !== 'Uploaded') { ?><button type="button" class="btn btn-xs btn-success preview-costcutting-sms" data-id="<?= (int) $batch->id; ?>"><i class="fa fa-commenting"></i> Send SMS</button><?php } ?></td>
                                         <td><a href="<?= $base_url; ?>cost_cutting/review/<?= (int) $batch->id; ?>" class="btn btn-xs btn-info"><i class="fa fa-eye"></i> View</a></td>
                                     </tr>
                                 <?php } ?>

@@ -94,9 +94,6 @@ echo "<pre>";
                                   <input type="checkbox" class="eod_all" id="eod_view" name="permission[eod_view]"> View
                                 </label></div>
                               <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="eod_all" id="eod_report" name="permission[eod_report]"> EOD report
-                                </label></div>
-                              <div class="checkbox icheck"><label>
                                   <input type="checkbox" class="eod_all" id="eod_adjustment_view" name="permission[eod_adjustment_view]"> View cash adjustments
                                 </label></div>
                               <div class="checkbox icheck"><label>
@@ -114,14 +111,97 @@ echo "<pre>";
                               <div class="checkbox icheck"><label>
                                   <input type="checkbox" class="eod_all" id="eod_audit_view" name="permission[eod_audit_view]"> View change history
                                 </label></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td><?= $i++; ?></td>
+                            <td>EOD report</td>
+                            <td>
                               <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="eod_all" id="payment_management_view" name="permission[payment_management_view]"> Payment list
+                                  <input type="checkbox" class="change_me" id="eod_report_module"> <?= $this->lang->line('select_all'); ?>
+                                </label></div>
+                            </td>
+                            <td>
+                              <input type="hidden" name="module[eod_report]" value="on">
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="eod_report_module_all" id="eod_report" name="permission[eod_report]"> View EOD report
+                                </label></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td><?= $i++; ?></td>
+                            <td>Payment Due</td>
+                            <td>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="change_me" id="payment_due"> <?= $this->lang->line('select_all'); ?>
+                                </label></div>
+                            </td>
+                            <td>
+                              <input type="hidden" name="module[payment_due]" value="on">
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="payment_due_all" id="payment_management_view" name="permission[payment_management_view]"> Payment list
                                 </label></div>
                               <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="eod_all" id="payment_management_record" name="permission[payment_management_record]"> Record manual payment
+                                  <input type="checkbox" class="payment_due_all" id="payment_management_record" name="permission[payment_management_record]"> Record manual payment
                                 </label></div>
                               <div class="checkbox icheck"><label>
-                                  <input type="checkbox" class="eod_all" id="payment_management_status" name="permission[payment_management_status]"> Bulk/status actions
+                                  <input type="checkbox" class="payment_due_all" id="payment_management_status" name="permission[payment_management_status]"> Bulk/status actions
+                                </label></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td><?= $i++; ?></td>
+                            <td>Canteen Due Generation</td>
+                            <td>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="change_me" id="due_generation_module"> <?= $this->lang->line('select_all'); ?>
+                                </label></div>
+                            </td>
+                            <td>
+                              <input type="hidden" name="module[due_generation]" value="on">
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="due_generation_module_all" id="due_generation_view" name="permission[payment_management_view]"> View
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="due_generation_module_all" id="due_generation_record" name="permission[payment_management_record]"> Generate / Reconcile
+                                </label></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td><?= $i++; ?></td>
+                            <td>Canteen Cost Cutting</td>
+                            <td>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="change_me" id="cost_cutting_module"> <?= $this->lang->line('select_all'); ?>
+                                </label></div>
+                            </td>
+                            <td>
+                              <input type="hidden" name="module[cost_cutting]" value="on">
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="cost_cutting_module_all" id="cost_cutting_view" name="permission[payment_management_view]"> View
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="cost_cutting_module_all" id="cost_cutting_record" name="permission[payment_management_record]"> Upload / Process batch
+                                </label></div>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td><?= $i++; ?></td>
+                            <td>Canteen Audit History</td>
+                            <td>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="change_me" id="canteen_audit_module"> <?= $this->lang->line('select_all'); ?>
+                                </label></div>
+                            </td>
+                            <td>
+                              <input type="hidden" name="module[canteen_audit]" value="on">
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="canteen_audit_module_all" id="canteen_audit_view" name="permission[payment_management_view]"> View audit history
                                 </label></div>
                             </td>
                           </tr>
@@ -677,7 +757,7 @@ echo "<pre>";
                           <!-- SMS -->
                           <tr>
                             <td><?= $i++; ?></td>
-                            <td><?= $this->lang->line('sms'); ?></td>
+                            <td>SMS Management</td>
                             <td>
                               <div class="checkbox icheck"><label>
                                   <input type="checkbox" class="change_me" id="sms"> <?= $this->lang->line('select_all'); ?>
@@ -856,16 +936,17 @@ echo "<pre>";
       $q1 = $this->db->query("select permissions from db_permissions where role_id=" . $q_id);
       if ($q1->num_rows() > 0) {
         foreach ($q1->result() as $res1) {
-          if (empty($str)) {
-            $str = ' #' . $res1->permissions;
-          } else {
-            $str = $str . ', #' . $res1->permissions;
+          if ($str !== '') {
+            $str .= ', ';
           }
+          $str .= 'input[name="permission[' . $res1->permissions . ']"]';
         }
       }
     }
     ?>
-    $('<?php echo $str; ?>').prop("checked", true).iCheck('update');
+    <?php if ($str !== '') { ?>
+      $('<?php echo $str; ?>').prop("checked", true).iCheck('update');
+    <?php } ?>
   </script>
   <!-- Make sidebar menu hughlighter/selector -->
   <script>
