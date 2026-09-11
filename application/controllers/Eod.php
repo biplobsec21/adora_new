@@ -30,6 +30,7 @@ class Eod extends MY_Controller
             ? $this->eod->get_audit_logs($closing_date)
             : array();
         $data['pending_date'] = $this->eod->get_pending_date($this->data['CUR_DATE'], $this->eod_start_date());
+        $data['late_collected_cash'] = $this->eod->get_late_collected_cash($closing_date);
         $this->load->view('eod/dashboard', $data);
     }
 

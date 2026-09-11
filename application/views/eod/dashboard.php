@@ -160,6 +160,14 @@
                                         <?= form_open('eod/close_day'); ?>
                                         <input type="hidden" name="closing_date" value="<?= html_escape($summary['closing_date']); ?>">
                                         <p>Save the displayed totals as the permanent EOD snapshot for <?= html_escape($summary['closing_date']); ?>.</p>
+                                        <?php if (!empty($late_collected_cash) && (float) $late_collected_cash['late_amount'] > 0) { ?>
+                                            <div class="alert alert-info" style="margin-top: 10px; margin-bottom: 10px; padding: 10px 15px;">
+                                                <strong>Late collected cash for <?= html_escape($late_collected_cash['previous_date']); ?>:</strong>
+                                                <?= $CI->currency(number_format((float) $late_collected_cash['late_amount'], 2, '.', '')); ?>
+                                                <br>
+                                                This amount belongs to <?= html_escape($late_collected_cash['previous_date']); ?> and will be reflected in that day’s EOD snapshot.
+                                            </div>
+                                        <?php } ?>
                                         <button type="submit" class="btn btn-success" onclick="return confirm('Close this date? This action cannot be undone from this screen.');"><i class="fa fa-lock"></i> Close Day</button>
                                         <?= form_close(); ?>
                                     <?php } ?>

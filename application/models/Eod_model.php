@@ -14,6 +14,7 @@ class Eod_model extends CI_Model
             'custom_cash_additions' => 0,
             'custom_cash_deductions' => 0,
             'final_cash_in_hand' => 0,
+            'late_entry_amount' => 0,
             'closing_type' => null,
             'closed_by' => null,
             'closed_at' => null,
@@ -67,6 +68,7 @@ class Eod_model extends CI_Model
         $closing = $this->db->get_where('db_daily_closing', array('closing_date' => $closing_date))->row();
         if ($closing) {
             $summary['final_cash_in_hand'] = (float) $closing->final_cash_in_hand;
+            $summary['late_entry_amount'] = (float) $closing->late_entry_amount;
             $summary['closing_type'] = $closing->closing_type;
             $summary['closed_by'] = $closing->created_by;
             $summary['closed_at'] = $closing->created_at;
@@ -87,6 +89,7 @@ class Eod_model extends CI_Model
                     c.custom_cash_additions,
                     c.custom_cash_deductions,
                     c.final_cash_in_hand,
+                    c.late_entry_amount,
                     c.created_by,
                     c.created_at,
                     COALESCE(a.adjustment_count, 0) AS adjustment_count
@@ -321,6 +324,50 @@ class Eod_model extends CI_Model
         return $query ? $query->pending_date : null;
     }
 
+    public function get_late_collected_cash($closing_date)
+    {
+        if (!is_string($closing_date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $closing_date)) {
+            return array(
+                'previous_date' => null,
+                'late_amount' => 0,
+                'saved_total_cash_collected' => 0,
+                'live_total_cash_collected' => 0,
+            );
+        }
+
+        $previous_date = date('Y-m-d', strtotime($closing_date . ' -1 day'));
+        $previous_closing = $this->db->get_where('db_daily_closing', array('closing_date' => $previous_date))->row();
+
+        if (!$previous_closing) {
+            return array(
+                'previous_date' => $previous_date,
+                'late_amount' => 0,
+                'saved_total_cash_collected' => 0,
+                'live_total_cash_collected' => 0,
+            );
+        }
+
+        $live_payment = $this->db->query(
+            "SELECT COALESCE(SUM(payment), 0) AS live_total_cash_collected
+             FROM db_salespayments
+             WHERE payment_date = ?
+               AND status = 1
+               AND payment > 0",
+            array($previous_date)
+        )->row();
+
+        $saved_total_cash_collected = (float) $previous_closing->total_cash_collected;
+        $live_total_cash_collected = (float) $live_payment->live_total_cash_collected;
+        $late_amount = max(0, $live_total_cash_collected - $saved_total_cash_collected);
+
+        return array(
+            'previous_date' => $previous_date,
+            'late_amount' => $late_amount,
+            'saved_total_cash_collected' => $saved_total_cash_collected,
+            'live_total_cash_collected' => $live_total_cash_collected,
+        );
+    }
+
     public function close_day($closing_date, $closing_type, $created_by, $system_ip)
     {
         $this->db->trans_begin();
@@ -329,6 +376,33 @@ class Eod_model extends CI_Model
         if ($existing) {
             $this->db->trans_rollback();
             return array('success' => false, 'message' => 'This date has already been closed.');
+        }
+
+        $late_entry_info = $this->get_late_collected_cash($closing_date);
+        $previous_date = $late_entry_info['previous_date'];
+        $late_entry_amount = (float) $late_entry_info['late_amount'];
+
+        if ($previous_date && $late_entry_amount > 0) {
+            $previous_closing = $this->db->get_where('db_daily_closing', array('closing_date' => $previous_date))->row();
+            if ($previous_closing) {
+                $previous_summary = $this->get_summary($previous_date);
+                $updated_final_cash = $previous_summary['total_cash_collected']
+                    - $previous_summary['total_expenses']
+                    + $previous_summary['custom_cash_additions']
+                    - $previous_summary['custom_cash_deductions'];
+
+                $this->write_audit($previous_date, 'db_daily_closing', $previous_closing->id, 'LATE_ENTRY', $previous_closing, $created_by, $system_ip);
+
+                $this->db->where('id', $previous_closing->id)->update('db_daily_closing', array(
+                    'total_sales_due' => $previous_summary['total_sales_due'],
+                    'total_cash_collected' => $previous_summary['total_cash_collected'],
+                    'total_expenses' => $previous_summary['total_expenses'],
+                    'custom_cash_additions' => $previous_summary['custom_cash_additions'],
+                    'custom_cash_deductions' => $previous_summary['custom_cash_deductions'],
+                    'final_cash_in_hand' => $updated_final_cash,
+                    'late_entry_amount' => $late_entry_amount,
+                ));
+            }
         }
 
         $summary = $this->get_summary($closing_date);
@@ -340,6 +414,7 @@ class Eod_model extends CI_Model
             'custom_cash_additions' => $summary['custom_cash_additions'],
             'custom_cash_deductions' => $summary['custom_cash_deductions'],
             'final_cash_in_hand' => $summary['final_cash_in_hand'],
+            'late_entry_amount' => 0,
             'closing_type' => $closing_type,
             'created_by' => $created_by,
             'system_ip' => $system_ip,
