@@ -16,6 +16,9 @@ class Eod extends MY_Controller
         $this->permission_check('eod_view');
         // die($this->eod_start_date());
         $closing_date = $this->input->get('date', true);
+        if ($closing_date === null || $closing_date === '') {
+            $closing_date = $this->data['CUR_DATE'];
+        }
         if (!$this->is_valid_date($closing_date) || $closing_date < $this->eod_start_date()) {
             $closing_date = $this->eod_start_date();
         }
