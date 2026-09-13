@@ -50,7 +50,10 @@ $config['base_url'] .= str_replace(basename($_SERVER['SCRIPT_NAME']), "", $_SERV
 $config['index_page'] = 'index.php';
 
 // EOD starts from this date; activity before it is legacy history.
-$config['eod_start_date'] = '2026-09-11';
+$config['eod_start_date'] = '2026-09-13';
+// First EOD date that should use opening cash logic instead of historical backfill.
+$config['eod_opening_date'] = '2026-09-13';
+$config['eod_opening_cash'] = 37530.00;  // Set the opening cash amount for the first EOD date.
 
 /*
 |--------------------------------------------------------------------------

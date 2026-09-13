@@ -375,6 +375,8 @@ class MY_Controller extends CI_Controller
     $this->session->set_userdata(array('view_date'  => $date_view_format));
     $this->session->set_userdata(array('view_time'  => $query->row()->time_format));
 
+    // Use the correct 24-hour format string for CUR_TIME when the site is configured for 24-hour time.
+    $time_format = (trim($query->row()->time_format) === '24') ? date("H:i:s") : date("h:i:s a");
 
     //CHECK LANGUAGE IN SESSION ELSE FROM DB
     if (!$this->session->has_userdata('language') && $this->session->has_userdata('logged_in')) {
@@ -415,6 +417,7 @@ class MY_Controller extends CI_Controller
   public function currency($value = '', $with_comma = false)
   {
     $value = trim($value);
+    $currency_symbol = html_entity_decode($this->session->userdata('currency'), ENT_QUOTES, 'UTF-8');
 
     if (!empty($value) && is_numeric($value)) {
       $value = ($with_comma) ? number_format($value, 2) : number_format($value, 2, '.', '');
@@ -422,14 +425,14 @@ class MY_Controller extends CI_Controller
 
     if ($this->session->userdata('currency_placement') === 'Left') {
       if (!empty($value)) {
-        return $this->session->userdata('currency') . " " . $value;
+        return $currency_symbol . " " . $value;
       }
-      return $this->session->userdata('currency') . "" . $value;
+      return $currency_symbol . "" . $value;
     } else {
       if (!empty($value)) {
-        return $value . " " . $this->session->userdata('currency');
+        return $value . " " . $currency_symbol;
       }
-      return $value . "" . $this->session->userdata('currency');
+      return $value . "" . $currency_symbol;
     }
   }
 

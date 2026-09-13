@@ -22,10 +22,14 @@ class Eod extends MY_Controller
         if (!$this->is_valid_date($closing_date) || $closing_date < $this->eod_start_date()) {
             $closing_date = $this->eod_start_date();
         }
+        if ($closing_date > $this->data['CUR_DATE']) {
+            $closing_date = $this->data['CUR_DATE'];
+        }
 
         $data = $this->data;
         $data['page_title'] = 'End of Day';
         $data['summary'] = $this->eod->get_summary($closing_date);
+        $data['late_entry'] = $this->eod->get_late_entry_summary($closing_date);
         $data['adjustments'] = $this->permissions('eod_adjustment_view')
             ? $this->eod->get_adjustments($closing_date)
             : array();
@@ -78,6 +82,9 @@ class Eod extends MY_Controller
         $page = (int) $this->input->get('page', true);
         if (!$this->is_valid_date($closing_date) || $closing_date < $this->eod_start_date()) {
             $closing_date = $this->eod_start_date();
+        }
+        if ($closing_date > $this->data['CUR_DATE']) {
+            $closing_date = $this->data['CUR_DATE'];
         }
         if ($page < 1) {
             $page = 1;
@@ -165,6 +172,9 @@ class Eod extends MY_Controller
     private function can_modify_date($closing_date)
     {
         if (!$this->is_valid_date($closing_date) || $closing_date < $this->eod_start_date()) {
+            return false;
+        }
+        if ($closing_date > $this->data['CUR_DATE']) {
             return false;
         }
         return $closing_date === $this->data['CUR_DATE'] || $this->permissions('eod_retroactive_close');

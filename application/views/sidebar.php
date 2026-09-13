@@ -258,6 +258,9 @@ $CI = &get_instance();
             <?php if ($CI->permissions('customers_view')) { ?>
               <li class="customers-view-active-li"><a href="<?php echo $base_url; ?>customers"><i class="fa fa-list "></i> <span><?= $this->lang->line('customers_list'); ?></span></a></li>
             <?php } ?>
+            <?php if ($CI->permissions('customer_loan_view') || $CI->permissions('customer_loan_add') || $CI->permissions('customer_loan_repayment')) { ?>
+              <li class="customer-loan-management-active-li"><a href="<?php echo $base_url; ?>customer_loan_management"><i class="fa fa-money text-green"></i> <span>Customer Loan Management</span></a></li>
+            <?php } ?>
 
             <?php if ($CI->permissions('import_customers')) { ?>
               <li class="import_customers-active-li"><a href="<?php echo $base_url; ?>import/customers"><i class="fa fa-arrow-circle-o-left "></i> <span><?= $this->lang->line('import_customers'); ?></span></a></li>

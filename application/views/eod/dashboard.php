@@ -42,18 +42,46 @@
                     </div>
                 <?php } ?>
 
+                <?php if (!empty($late_entry)) { ?>
+                    <div class="callout callout-warning">
+                        <h4><i class="fa fa-clock-o"></i> Late entry detected for <?= html_escape($late_entry['previous_date']); ?></h4>
+                        <p>New activity has been recorded after <?= html_escape($late_entry['previous_date']); ?> was already closed. The stored EOD snapshot is now out of sync.</p>
+                        <ul>
+                            <?php foreach ($late_entry['mismatch_details'] as $detail) { ?>
+                                <li>
+                                    <?= html_escape(str_replace('_', ' ', $detail['field'])); ?>:
+                                    live <?= $CI->currency(number_format((float) $detail['live_value'], 2, '.', '')); ?>
+                                    vs saved <?= $CI->currency(number_format((float) $detail['stored_value'], 2, '.', '')); ?>
+                                </li>
+                            <?php } ?>
+                        </ul>
+                        <p><a href="<?= $base_url; ?>eod?date=<?= rawurlencode($late_entry['previous_date']); ?>" class="btn btn-info btn-sm"><i class="fa fa-calendar"></i> Open <?= html_escape($late_entry['previous_date']); ?> EOD</a></p>
+                    </div>
+                <?php } ?>
+
                 <div class="box box-primary">
                     <div class="box-header with-border">
                         <h3 class="box-title">Summary Date</h3>
                     </div>
                     <div class="box-body">
-                        <form method="get" action="<?= $base_url; ?>eod" class="form-inline">
-                            <div class="form-group">
-                                <label for="eod-date">Date</label>
-                                <input type="date" id="eod-date" name="date" class="form-control" value="<?= html_escape($summary['closing_date']); ?>">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <form method="get" action="<?= $base_url; ?>eod" class="form-inline">
+                                    <div class="form-group">
+                                        <label for="eod-date">Date</label>
+                                        <input type="date" id="eod-date" name="date" class="form-control" value="<?= html_escape($summary['closing_date']); ?>" max="<?= html_escape($CUR_DATE); ?>">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">View Summary</button>
+                                </form>
                             </div>
-                            <button type="submit" class="btn btn-primary">View Summary</button>
-                        </form>
+                            <?php if (isset($summary['opening_cash']) && $summary['opening_cash'] !== null) { ?>
+                                <div class="col-md-6 text-right">
+                                    <div class="alert alert-success" style="display: inline-block; margin: 0; padding: 10px 20px; font-size: 16px; text-align: left;">
+                                        <strong>Today's opening cash is:</strong> <?= $CI->currency(number_format((float) $summary['opening_cash'], 2, '.', '')); ?>
+                                    </div>
+                                </div>
+                            <?php } ?>
+                        </div>
                     </div>
                 </div>
 
@@ -61,7 +89,9 @@
                     <?php
                     $cards = array(
                         array('label' => 'Collected Cash', 'value' => $summary['total_cash_collected'], 'class' => 'bg-green', 'icon' => 'fa-money', 'detail_type' => 'collected_cash'),
-                        array('label' => 'Sales Due', 'value' => $summary['total_sales_due'], 'class' => 'bg-yellow', 'icon' => 'fa-clock-o', 'detail_type' => 'sales_due'),
+                        array('label' => 'Purchase Payments', 'value' => $summary['total_purchase_paid'], 'class' => 'bg-red', 'icon' => 'fa-shopping-cart', 'detail_type' => 'purchase_payments'),
+                        array('label' => 'Loan Given', 'value' => $summary['total_loan_given'], 'class' => 'bg-orange', 'icon' => 'fa-credit-card', 'detail_type' => 'loan_given'),
+                        array('label' => 'Loan Repayments', 'value' => $summary['total_loan_repayments_received'], 'class' => 'bg-purple', 'icon' => 'fa-refresh', 'detail_type' => 'loan_repayments'),
                         array('label' => 'Expenses', 'value' => $summary['total_expenses'], 'class' => 'bg-red', 'icon' => 'fa-minus-circle', 'detail_type' => 'expenses'),
                         array('label' => 'Final Cash In Hand', 'value' => $summary['final_cash_in_hand'], 'class' => 'bg-aqua', 'icon' => 'fa-calculator', 'detail_type' => null),
                     );
@@ -255,6 +285,7 @@
                                             <th>Changed By</th>
                                             <th>IP Address</th>
                                             <th>Previous Data</th>
+                                            <th>New Data</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -267,6 +298,7 @@
                                                 <td><?= html_escape($audit->changed_by); ?></td>
                                                 <td><?= html_escape($audit->system_ip); ?></td>
                                                 <td><code><?= html_escape($audit->old_value); ?></code></td>
+                                                <td><code><?= html_escape($audit->new_value); ?></code></td>
                                             </tr>
                                         <?php } ?>
                                     </tbody>
@@ -343,6 +375,33 @@
                         ['note', 'Note'],
                         ['created_by', 'Created By']
                     ];
+                } else if (response.type === 'purchase_payments') {
+                    columns = [
+                        ['transaction_date', 'Date'],
+                        ['purchase_id', 'Purchase ID'],
+                        ['payment_type', 'Payment Type'],
+                        ['amount', 'Amount'],
+                        ['note', 'Note'],
+                        ['created_by', 'Created By']
+                    ];
+                } else if (response.type === 'loan_given') {
+                    columns = [
+                        ['transaction_date', 'Date'],
+                        ['loan_id', 'Loan ID'],
+                        ['payment_method', 'Payment Method'],
+                        ['amount', 'Amount'],
+                        ['note', 'Note'],
+                        ['created_by', 'Created By']
+                    ];
+                } else if (response.type === 'loan_repayments') {
+                    columns = [
+                        ['transaction_date', 'Date'],
+                        ['loan_id', 'Loan ID'],
+                        ['payment_method', 'Payment Method'],
+                        ['amount', 'Amount'],
+                        ['note', 'Note'],
+                        ['created_by', 'Created By']
+                    ];
                 } else if (response.type === 'sales_due') {
                     columns = [
                         ['transaction_date', 'Date'],
@@ -381,6 +440,7 @@
                 $('#eod-details-page-status').text(response.total + ' record(s), page ' + response.page + ' of ' + (response.total_pages || 1));
                 $('#eod-details-prev').prop('disabled', response.page <= 1);
                 $('#eod-details-next').prop('disabled', response.page >= response.total_pages || response.total_pages === 0);
+                $('#eod-details-title').text(detailState.label + ' Details - ' + detailState.date + ' (' + formatAmount(response.total_amount) + ')');
             }
 
             function loadDetails() {
