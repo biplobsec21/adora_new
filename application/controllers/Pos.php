@@ -57,6 +57,9 @@ class Pos extends MY_Controller {
 	    echo $this->pos_model->receive_order();
 	}
 	public function pos_save_update(){
+		if (!$this->permissions('send_sms')) {
+			unset($_POST['send_sms']);
+		}
 	    $result='';
 	    if($this->input->post('command')=='update'){//Update
 	    	$result = $this->pos_model->pos_save_update();

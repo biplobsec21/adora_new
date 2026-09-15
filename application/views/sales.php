@@ -454,35 +454,29 @@
                         <?php
                         //Change Return
                         $send_sms_checkbox = 'disabled';
-                        if ($CI->is_sms_enabled()) {
-                           if (!isset($sales_id)) {
-                              $send_sms_checkbox = 'checked';
-                           } else {
-                              $send_sms_checkbox = '';
-                           }
+                        if ($CI->is_sms_enabled() && $CI->permissions('send_sms')) {
+                           $send_sms_checkbox = '';
                         }
 
                         ?>
 
-                        <!--<div class="col-xs-12 ">-->
-                        <!--   <div class="col-sm-12">-->
-                        <!--         <div class="box-body ">-->
-                        <!--            <div class="col-md-12">-->
-                        <!--              <div class="checkbox icheck">-->
-                        <!--        <label>-->
-                        <!--          <input type="checkbox" <?= $send_sms_checkbox; ?> class="form-control" id="send_sms" name="send_sms" > <label for="sales_discount" class=" control-label"><?= $this->lang->line('send_sms_to_customer'); ?>-->
-                        <!--            <i class="hover-q " data-container="body" data-toggle="popover" data-placement="top" data-content="If checkbox is Disabled! You need to enable it from SMS -> SMS API <br><b>Note:<i>Walk-in Customer will not receive SMS!</i></b>" data-html="true" data-trigger="hover" data-original-title="" title="Do you wants to send SMS ?">-->
-                        <!--    <i class="fa fa-info-circle text-maroon text-black hover-q"></i>-->
-                        <!--  </i>-->
-                        <!--          </label>-->
-                        <!--        </label>-->
-                        <!--      </div>-->
-                        <!--          </div><!-- col-md-12 -->-->
-                        <!--         </div>-->
-                        <!-- /.box-body -->
-                        <!--      </div>-->
-                        <!-- /.box -->
-                        <!--</div> -->
+                        <div class="col-xs-12">
+                           <div class="col-sm-12">
+                              <div class="box-body">
+                                 <div class="col-md-12">
+                                    <div class="checkbox icheck">
+                                       <label>
+                                          <input type="checkbox" <?= $send_sms_checkbox; ?> class="form-control" id="send_sms" name="send_sms">
+                                          <span class="control-label"><?= $this->lang->line('send_sms_to_customer'); ?></span>
+                                          <i class="hover-q" data-container="body" data-toggle="popover" data-placement="top" data-content="Enable SMS in SMS Management first. Walk-in customers will not receive SMS." data-html="true" data-trigger="hover" title="Send SMS after invoice save">
+                                             <i class="fa fa-info-circle text-maroon text-black hover-q"></i>
+                                          </i>
+                                       </label>
+                                    </div>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
                      </div>
 
                      <!-- /.box-body -->

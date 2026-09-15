@@ -47,7 +47,16 @@ class Sms_model extends CI_Model
 	//Send Messagr
 	public function send_sms($mobile, $message)
 	{
-		$sms_status = $this->db->query("select sms_status from db_company where id=1")->row()->sms_status;
+		$sms_status = null;
+		if ($this->db->table_exists('db_sms_settings')) {
+			$sms_settings = $this->db->select('enabled')->get_where('db_sms_settings', array('id' => 1))->row();
+			if ($sms_settings) {
+				$sms_status = (int) $sms_settings->enabled;
+			}
+		}
+		if ($sms_status === null) {
+			$sms_status = $this->db->query("select sms_status from db_company where id=1")->row()->sms_status;
+		}
 		if ((int)$sms_status === 1) {
 			$q1 = $this->db->query("select * from db_smsapi");
 			if ($q1->num_rows() > 0) {

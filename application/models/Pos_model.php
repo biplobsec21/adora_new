@@ -421,17 +421,19 @@ class Pos_model extends CI_Model
 				return "failed";
 			}
 		}
-		//COMMIT RECORD
-		$this->db->trans_commit();
 
 		$sms_info = '';
-		if (isset($send_sms) && $customer_id != 1) {
-			if (send_sms_using_template($sales_id, 1) == true) {
+		if (isset($send_sms) && (int)$customer_id !== 1) {
+			$this->load->model('sms_service_model', 'sms_service');
+			if ($this->sms_service->send_sales_invoice($sales_id, $this->data)) {
 				$sms_info = 'SMS Has been Sent!';
 			} else {
 				$sms_info = 'Failed to Send SMS';
 			}
 		}
+
+		//COMMIT RECORD
+		$this->db->trans_commit();
 
 		$this->session->set_flashdata('success', 'Success!! Sales Created Successfully!' . $sms_info);
 		return "success<<<###>>>$sales_id";

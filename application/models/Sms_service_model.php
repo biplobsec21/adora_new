@@ -7,7 +7,37 @@ class Sms_service_model extends CI_Model
     public function get_settings()
     {
         $row = $this->db->get_where('db_sms_settings', array('id' => 1))->row();
-        return $row ?: (object) array('id' => 1, 'provider_url' => 'http://bulksmsbd.net/api/smsapi', 'many_provider_url' => 'http://bulksmsbd.net/api/smsapimany', 'balance_url' => 'http://bulksmsbd.net/api/getBalanceApi', 'api_key' => '', 'sender_id' => '', 'enabled' => 0, 'due_generation_enabled' => 0, 'cost_cutting_enabled' => 0);
+        return $row ?: (object) array('id' => 1, 'provider_url' => 'http://bulksmsbd.net/api/smsapi', 'many_provider_url' => 'http://bulksmsbd.net/api/smsapimany', 'balance_url' => 'http://bulksmsbd.net/api/getBalanceApi', 'api_key' => '', 'sender_id' => '', 'enabled' => 0, 'sales_invoice_enabled' => 0, 'due_generation_enabled' => 0, 'cost_cutting_enabled' => 0);
+    }
+
+    public function get_balance()
+    {
+        $settings = $this->get_settings();
+        if (trim((string) $settings->balance_url) === '' || trim((string) $settings->api_key) === '') {
+            return array('success' => false, 'message' => 'Balance API is not configured.');
+        }
+
+        $url = $settings->balance_url . (strpos($settings->balance_url, '?') === false ? '?' : '&') . http_build_query(array('api_key' => $settings->api_key));
+        $ch = curl_init($url);
+        curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => true));
+        $body = curl_exec($ch);
+        $error = curl_error($ch);
+        $http_code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($error || $http_code < 200 || $http_code >= 300) {
+            return array('success' => false, 'message' => $error ?: 'Balance API request failed.');
+        }
+
+        $response = json_decode((string) $body, true);
+        $balance = is_array($response) ? ($response['balance'] ?? ($response['data']['balance'] ?? null)) : null;
+        if ($balance === null && is_numeric(trim((string) $body))) {
+            $balance = trim((string) $body);
+        }
+
+        return $balance !== null
+            ? array('success' => true, 'balance' => $balance)
+            : array('success' => false, 'message' => 'Balance was not returned by the provider.');
     }
 
     public function save_settings($input, $user)
@@ -19,6 +49,7 @@ class Sms_service_model extends CI_Model
             'api_key' => trim($input['api_key']),
             'sender_id' => trim($input['sender_id']),
             'enabled' => empty($input['enabled']) ? 0 : 1,
+            'sales_invoice_enabled' => empty($input['sales_invoice_enabled']) ? 0 : 1,
             'due_generation_enabled' => empty($input['due_generation_enabled']) ? 0 : 1,
             'cost_cutting_enabled' => empty($input['cost_cutting_enabled']) ? 0 : 1,
             'updated_by' => $user['CUR_USERNAME'],
@@ -32,6 +63,31 @@ class Sms_service_model extends CI_Model
     public function save_template($id, $body, $enabled, $user)
     {
         return $this->db->where('id', (int) $id)->update('db_sms_templates', array('message_body' => trim($body), 'enabled' => empty($enabled) ? 0 : 1, 'updated_by' => $user['CUR_USERNAME']));
+    }
+
+    public function send_sales_invoice($sales_id, $user)
+    {
+        $settings = $this->get_settings();
+        if (!(int) $settings->enabled) return false;
+
+        $sale = $this->db->select('s.id, s.customer_id, s.sales_code, s.sales_date, s.grand_total, s.paid_amount, c.sales_due, c.customer_name, c.customer_number, c.mobile')
+            ->from('db_sales s')
+            ->join('db_customers c', 'c.id = s.customer_id', 'inner')
+            ->where('s.id', (int) $sales_id)
+            ->where('c.status', 1)
+            ->get()->row();
+        if (!$sale || (int) $sale->customer_id === 1 || trim((string) $sale->mobile) === '') return false;
+
+        return $this->send_customer_event('sales_invoice', $sale->customer_id, array(
+            'due_month' => date('M Y', strtotime($sale->sales_date)),
+            'total_due' => $sale->sales_due,
+            'new_due' => max(0, (float) $sale->grand_total - (float) $sale->paid_amount),
+            'sales_code' => $sale->sales_code,
+            'sales_amount' => $sale->grand_total,
+            'paid_amount' => $sale->paid_amount,
+            'invoice_due' => max(0, (float) $sale->grand_total - (float) $sale->paid_amount),
+            'remaining_due' => $sale->sales_due,
+        ), null, null, $user);
     }
     public function get_logs($date = '')
     {
@@ -336,9 +392,9 @@ class Sms_service_model extends CI_Model
 
     private function render_message($template, $customer, $values)
     {
-        $values = array_merge(array('due_month' => date('M Y'), 'total_due' => 0, 'new_due' => 0, 'cut_amount' => 0, 'remaining_due' => 0), $values);
+        $values = array_merge(array('due_month' => date('M Y'), 'total_due' => 0, 'new_due' => 0, 'cut_amount' => 0, 'remaining_due' => 0, 'sales_code' => '', 'sales_amount' => 0, 'paid_amount' => 0, 'invoice_due' => 0), $values);
         $site = $this->db->select('site_name')->where('id', 1)->get('db_sitesettings')->row();
-        return strtr($template, array('{customer_name}' => $customer->customer_name, '{customer_number}' => $customer->customer_number, '{due_month}' => $values['due_month'], '{total_due}' => number_format($values['total_due'], 2), '{new_due}' => number_format($values['new_due'], 2), '{cut_amount}' => number_format($values['cut_amount'], 2), '{remaining_due}' => number_format($values['remaining_due'], 2), '{ledger_url}' => $this->get_or_create_ledger_url($customer->id), '{site_name}' => $site ? $site->site_name : 'Canteen'));
+        return strtr($template, array('{customer_name}' => $customer->customer_name, '{customer_number}' => $customer->customer_number, '{due_month}' => $values['due_month'], '{total_due}' => number_format($values['total_due'], 2), '{new_due}' => number_format($values['new_due'], 2), '{cut_amount}' => number_format($values['cut_amount'], 2), '{remaining_due}' => number_format($values['remaining_due'], 2), '{sales_code}' => $values['sales_code'], '{sales_amount}' => number_format($values['sales_amount'], 2), '{paid_amount}' => number_format($values['paid_amount'], 2), '{invoice_due}' => number_format($values['invoice_due'], 2), '{ledger_url}' => $this->get_or_create_ledger_url($customer->id), '{site_name}' => $site ? $site->site_name : 'Canteen'));
     }
 
     private function create_short_token()
@@ -379,8 +435,28 @@ class Sms_service_model extends CI_Model
         curl_setopt_array($ch, array(CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30, CURLOPT_SSL_VERIFYPEER => true));
         $body = curl_exec($ch);
         $error = curl_error($ch);
+        $http_code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        $code = trim((string) preg_replace('/[^0-9]/', '', substr((string) $body, 0, 10)));
-        return array('code' => $code, 'body' => (string) $body, 'error' => $error ?: 'Provider did not return success code 202.');
+
+        $body = (string) $body;
+        $decoded = json_decode($body, true);
+        $code = '';
+        if (is_array($decoded)) {
+            if (isset($decoded['response_code'])) {
+                $code = (string) $decoded['response_code'];
+            } elseif (isset($decoded['code'])) {
+                $code = (string) $decoded['code'];
+            }
+        }
+        if ($code === '') {
+            $code = trim((string) preg_replace('/[^0-9]/', '', substr($body, 0, 10)));
+        }
+
+        $success = $code === '202' || ($code === '' && $http_code >= 200 && $http_code < 300);
+        return array(
+            'code' => $code,
+            'body' => $body,
+            'error' => $success ? null : ($error ?: 'Provider did not return success code 202.'),
+        );
     }
 }

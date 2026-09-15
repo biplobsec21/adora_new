@@ -50,7 +50,7 @@ if (! function_exists('send_sms_using_template')) {
 							//echo $content;exit();
 							$CI->load->model('sms_model');
 
-							return $CI->sms_model->send_sms($q2->row()->mobile, $content);
+							return $CI->sms_model->send_sms($q2->row()->mobile, $content) === 'success';
 						} else {
 							return false;
 						}
@@ -83,7 +83,7 @@ if (! function_exists('send_sms_using_template')) {
 
 							//echo $content;exit();
 							$CI->load->model('sms_model');
-							return $CI->sms_model->send_sms($q2->row()->mobile, $content);
+							return $CI->sms_model->send_sms($q2->row()->mobile, $content) === 'success';
 						} else {
 							return false;
 						}
@@ -108,6 +108,13 @@ if (! function_exists('is_sms_enabled')) {
 	function is_sms_enabled()
 	{
 		$CI = &get_instance();
+		if ($CI->db->table_exists('db_sms_settings')) {
+			$sms_settings = $CI->db->select('enabled')->get_where('db_sms_settings', array('id' => 1))->row();
+			if ($sms_settings) {
+				return (int) $sms_settings->enabled === 1;
+			}
+		}
+
 		$sms_status = $CI->db->select('sms_status')->get('db_company')->row()->sms_status;
 		return ($sms_status) ? true : false;
 	}

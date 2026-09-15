@@ -37,6 +37,9 @@ class Sales extends MY_Controller
 
 	public function sales_save_and_update()
 	{
+		if (!$this->permissions('send_sms')) {
+			unset($_POST['send_sms']);
+		}
 		$this->form_validation->set_rules('sales_date', 'Sales Date', 'trim|required');
 		$this->form_validation->set_rules('customer_id', 'Customer Name', 'trim|required');
 

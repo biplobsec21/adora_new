@@ -16,6 +16,7 @@ class Sms_management extends MY_Controller
         $data = $this->data;
         $data['page_title'] = 'SMS Management';
         $data['settings'] = $this->sms_service->get_settings();
+        $data['sms_balance'] = $this->sms_service->get_balance();
         $data['templates'] = $this->sms_service->get_templates();
         $data['logs'] = $this->sms_service->get_logs(date('Y-m'));
         $this->load->view('sms-management/index', $data);

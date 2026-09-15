@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS `db_sms_settings` (
   `api_key` varchar(255) NOT NULL DEFAULT '',
   `sender_id` varchar(100) NOT NULL DEFAULT '',
   `enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `sales_invoice_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `due_generation_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `cost_cutting_enabled` tinyint(1) NOT NULL DEFAULT 0,
   `updated_by` varchar(50) DEFAULT NULL,
@@ -21,7 +22,7 @@ ON DUPLICATE KEY UPDATE `id` = `id`;
 
 CREATE TABLE IF NOT EXISTS `db_sms_templates` (
   `id` int(50) NOT NULL AUTO_INCREMENT,
-  `event_key` enum('due_generation','cost_cutting') NOT NULL,
+  `event_key` enum('sales_invoice','due_generation','cost_cutting') NOT NULL,
   `template_name` varchar(100) NOT NULL,
   `message_body` text NOT NULL,
   `enabled` tinyint(1) NOT NULL DEFAULT 1,
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS `db_sms_templates` (
 
 INSERT INTO `db_sms_templates` (`event_key`, `template_name`, `message_body`)
 VALUES
+  ('sales_invoice', 'Sales Invoice', 'Hello {customer_name}, your invoice {sales_code} for {sales_amount} has been created. Paid: {paid_amount}. Invoice due: {invoice_due}. Thank you, {site_name}.'),
   ('due_generation', 'Customer Due Generation', 'Your {due_month} due is {total_due}. Ledger: {ledger_url}'),
   ('cost_cutting', 'Cost Cutting Processed', 'Your {due_month} payment of {cut_amount} was processed. Remaining due: {remaining_due}.')
 ON DUPLICATE KEY UPDATE `event_key` = `event_key`;

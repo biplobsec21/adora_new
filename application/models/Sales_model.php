@@ -486,7 +486,8 @@ class Sales_model extends CI_Model
 
 		$sms_info = '';
 		if (isset($send_sms) && (int)$customer_id !== 1) {
-			if (send_sms_using_template($sales_id, 1) === true) {
+			$this->load->model('sms_service_model', 'sms_service');
+			if ($this->sms_service->send_sales_invoice($sales_id, $this->data)) {
 				$sms_info = 'SMS Has been Sent!';
 			} else {
 				$sms_info = 'Failed to Send SMS';
