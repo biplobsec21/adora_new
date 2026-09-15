@@ -52,10 +52,11 @@ class Due_generation_model extends CI_Model
         $summary = array('total_records' => 0, 'total_new_due' => 0, 'total_previous_outstanding' => 0, 'total_due_amount' => 0, 'total_remaining_due' => 0);
         foreach ($customers as $customer) {
             $new_due = $this->get_cycle_new_due($customer->id, $cycle['billing_cycle_start'], $cycle['next_cycle_start']);
+            $loan_due = round($this->get_loan_due_movement($customer->id, $cycle['billing_cycle_start'], $cycle['next_cycle_start']), 2);
             $previous = $this->get_previous_outstanding($customer->id, $cycle['due_cycle_date']);
             $total = round($previous + $new_due, 2);
             if ($total <= 0) continue;
-            $item = array('generation_id' => $generation_id, 'customer_id' => $customer->id, 'customer_number' => $customer->customer_number, 'customer_name' => $customer->customer_name, 'mobile' => $customer->mobile, 'previous_outstanding_amount' => $previous, 'new_due_amount' => $new_due, 'total_due_amount' => $total, 'remaining_due_amount' => $total);
+            $item = array('generation_id' => $generation_id, 'customer_id' => $customer->id, 'customer_number' => $customer->customer_number, 'customer_name' => $customer->customer_name, 'mobile' => $customer->mobile, 'previous_outstanding_amount' => $previous, 'loan_due_amount' => $loan_due, 'new_due_amount' => $new_due, 'total_due_amount' => $total, 'remaining_due_amount' => $total);
             $this->db->insert('db_due_generation_items', $item);
             $rows[] = $item;
             $summary['total_records']++;
@@ -119,9 +120,10 @@ class Due_generation_model extends CI_Model
         $rows = array();
         $summary = array('total_records' => 0, 'total_new_due' => 0, 'total_previous_outstanding' => 0, 'total_due_amount' => 0, 'total_remaining_due' => 0);
         foreach ($customers as $customer) {
-            $opening_due = $this->get_customer_current_due($customer->id);
+            $opening_due = $this->get_customer_current_due($customer->id, $user_data['CUR_DATE']);
+            $loan_due = round($this->get_loan_due_movement($customer->id, '0000-01-01', date('Y-m-d', strtotime($user_data['CUR_DATE'] . ' +1 day'))), 2);
             if ($opening_due <= 0) continue;
-            $item = array('generation_id' => $generation_id, 'customer_id' => $customer->id, 'customer_number' => $customer->customer_number, 'customer_name' => $customer->customer_name, 'mobile' => $customer->mobile, 'previous_outstanding_amount' => 0, 'new_due_amount' => $opening_due, 'total_due_amount' => $opening_due, 'remaining_due_amount' => $opening_due);
+            $item = array('generation_id' => $generation_id, 'customer_id' => $customer->id, 'customer_number' => $customer->customer_number, 'customer_name' => $customer->customer_name, 'mobile' => $customer->mobile, 'previous_outstanding_amount' => 0, 'loan_due_amount' => $loan_due, 'new_due_amount' => $opening_due, 'total_due_amount' => $opening_due, 'remaining_due_amount' => $opening_due);
             $this->db->insert('db_due_generation_items', $item);
             $rows[] = $item;
             $summary['total_records']++;
@@ -250,15 +252,30 @@ class Due_generation_model extends CI_Model
     private function get_cycle_new_due($customer_id, $start, $next_start)
     {
         $row = $this->db->select('COALESCE(SUM(GREATEST(grand_total - paid_amount, 0)), 0) AS due', false)->where('customer_id', (int) $customer_id)->where('status', 1)->where('sales_status', 'Final')->where('sales_date >=', $start)->where('sales_date <', $next_start)->get('db_sales')->row();
-        return max(0, (float) $row->due);
+        return round(max(0, (float) $row->due) + $this->get_loan_due_movement($customer_id, $start, $next_start), 2);
     }
-    private function get_customer_current_due($customer_id)
+    private function get_customer_current_due($customer_id, $as_of_date)
     {
         $customer = $this->db->get_where('db_customers', array('id' => (int) $customer_id, 'status' => 1))->row();
         if (!$customer) return 0;
         $opening_paid = (float) $this->db->select_sum('payment')->where(array('customer_id' => (int) $customer_id, 'status' => 1))->get('db_cobpayments')->row()->payment;
         $sales = $this->db->select('COALESCE(SUM(GREATEST(grand_total - paid_amount, 0)), 0) AS due', false)->where(array('customer_id' => (int) $customer_id, 'status' => 1, 'sales_status' => 'Final'))->get('db_sales')->row();
-        return max(0, round((float) $customer->opening_balance - $opening_paid + (float) $sales->due, 2));
+        $loan_due = $this->get_loan_due_movement($customer_id, '0000-01-01', date('Y-m-d', strtotime($as_of_date . ' +1 day')));
+        return max(0, round((float) $customer->opening_balance - $opening_paid + (float) $sales->due + $loan_due, 2));
+    }
+
+    private function get_loan_due_movement($customer_id, $start, $end)
+    {
+        $row = $this->db->select('COALESCE(SUM(CASE WHEN transaction_type = "LOAN_ISSUE" THEN amount ELSE 0 END), 0) AS loan_issued,
+                                  COALESCE(SUM(CASE WHEN transaction_type = "REPAYMENT" THEN amount ELSE 0 END), 0) AS loan_repaid')
+            ->where('customer_id', (int) $customer_id)
+            ->where('transaction_date >=', $start)
+            ->where('transaction_date <', $end)
+            ->where_in('transaction_type', array('LOAN_ISSUE', 'REPAYMENT'))
+            ->get('db_customer_loan_transactions')
+            ->row();
+
+        return (float) $row->loan_issued - (float) $row->loan_repaid;
     }
     private function write_generation_csv($due_cycle_date, $rows, $opening = false)
     {

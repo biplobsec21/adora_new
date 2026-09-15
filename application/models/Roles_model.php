@@ -217,6 +217,7 @@ class Roles_model extends CI_Model {
 							                            'customers_delete',
 							                            'customers_view',
 			'customer_loan_add',
+			'customer_loan_edit',
 			'customer_loan_repayment',
 			'customer_loan_view',
 							                            'purchase_add',

@@ -243,7 +243,7 @@ $CI = &get_instance();
       <?php } ?>
 
       <!--<li class="header">CUSTOMERS</li>-->
-      <?php if ($CI->permissions('customers_add') || $CI->permissions('customers_view') || $CI->permissions('customers_edit') || $CI->permissions('import_customers')) { ?>
+      <?php if ($CI->permissions('customers_add') || $CI->permissions('customers_view') || $CI->permissions('customers_edit') || $CI->permissions('import_customers') || $CI->permissions('customer_loan_view') || $CI->permissions('customer_loan_add') || $CI->permissions('customer_loan_edit') || $CI->permissions('customer_loan_repayment')) { ?>
         <li class="customers-view-active-li customers-active-li import_customers-active-li customer-number-migration-active-li treeview">
           <a href="#">
             <i class="fa fa-group text-aqua"></i> <span><?= $this->lang->line('customers'); ?></span>
@@ -629,24 +629,34 @@ $CI = &get_instance();
     (function() {
       var path = window.location.pathname;
       var activeClass = '';
+      var parentClass = '';
 
-      if (/\/payment_management(?:\/|$)/.test(path)) {
+      if (/\/customer_loan_management(?:\/|$)/.test(path)) {
+        activeClass = 'customer-loan-management-active-li';
+        parentClass = 'customers-view-active-li';
+      } else if (/\/payment_management(?:\/|$)/.test(path)) {
         activeClass = 'payment-management-active-li';
+        parentClass = 'payment-management-group-active-li';
       } else if (/\/eod(?:\/|$)/.test(path)) {
         activeClass = 'eod-active-li';
+        parentClass = 'payment-management-group-active-li';
       } else if (/\/cost_cutting(?:\/|$)/.test(path)) {
         activeClass = 'cost-cutting-active-li';
+        parentClass = 'payment-management-group-active-li';
       } else if (/\/due_generation(?:\/|$)/.test(path)) {
         activeClass = 'due-generation-active-li';
+        parentClass = 'payment-management-group-active-li';
       } else if (/\/canteen_audit(?:\/|$)/.test(path)) {
         activeClass = 'canteen-audit-active-li';
+        parentClass = 'payment-management-group-active-li';
       } else if (/\/sms_management(?:\/|$)/.test(path)) {
         activeClass = 'sms-management-active-li';
+        parentClass = 'payment-management-group-active-li';
       }
 
       if (activeClass !== '') {
         $('.' + activeClass).addClass('active');
-        $('.payment-management-group-active-li').addClass('active');
+        $('.' + parentClass).addClass('active');
       }
     }());
   </script>

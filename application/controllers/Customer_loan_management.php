@@ -17,7 +17,24 @@ class Customer_loan_management extends MY_Controller
 
         $data = $this->data;
         $data['page_title'] = 'Customer Loan Management';
-        $data['loans'] = $this->customer_loans->get_loans();
+        $data['customers'] = $this->customer_loans->get_customers();
+        $data['selected_customer_id'] = (int) $this->input->get('customer_id', true);
+        $data['selected_from_date'] = trim((string) $this->input->get('from_date', true)) ?: date('01-m-Y');
+        $data['selected_to_date'] = trim((string) $this->input->get('to_date', true)) ?: date('d-m-Y');
+        $from_date = $data['selected_from_date'] ? system_fromatted_date($data['selected_from_date']) : '';
+        $to_date = $data['selected_to_date'] ? system_fromatted_date($data['selected_to_date']) : '';
+
+        if (($from_date && !$this->is_valid_date($from_date)) || ($to_date && !$this->is_valid_date($to_date))) {
+            $this->session->set_flashdata('error', 'Invalid loan date filter.');
+            redirect(base_url('customer_loan_management'), 'refresh');
+        }
+        if ($from_date && $to_date && $from_date > $to_date) {
+            $this->session->set_flashdata('error', 'The From date cannot be later than the To date.');
+            redirect(base_url('customer_loan_management'), 'refresh');
+        }
+
+        $data['loans'] = $this->customer_loans->get_loans($data['selected_customer_id'], $from_date, $to_date);
+        $data['audit_logs'] = $this->customer_loans->get_audit_logs($data['selected_customer_id'], $from_date, $to_date);
 
         $this->load->view('customer-loan-management/list', $data);
     }
@@ -31,6 +48,24 @@ class Customer_loan_management extends MY_Controller
         $data['customers'] = $this->customer_loans->get_customers();
 
         $this->load->view('customer-loan-management/add', $data);
+    }
+
+    public function edit($loan_id = 0)
+    {
+        $this->permission_check('customer_loan_edit');
+
+        $loan_id = (int) $loan_id;
+        $loan = $this->customer_loans->get_loan($loan_id);
+        if (!$loan) {
+            show_404();
+        }
+
+        $data = $this->data;
+        $data['page_title'] = 'Edit Customer Loan';
+        $data['loan'] = $loan;
+        $data['customers'] = $this->customer_loans->get_customers();
+
+        $this->load->view('customer-loan-management/edit', $data);
     }
 
     public function save()
@@ -47,6 +82,26 @@ class Customer_loan_management extends MY_Controller
         }
 
         $result = $this->customer_loans->create_loan($customer_id, $loan_amount, $loan_date, $note, $this->data);
+
+        $this->session->set_flashdata($result['success'] ? 'success' : 'error', $result['message']);
+        redirect(base_url('customer_loan_management'), 'refresh');
+    }
+
+    public function update()
+    {
+        $this->permission_check_with_msg('customer_loan_edit');
+
+        $loan_id = (int) $this->input->post('loan_id', true);
+        $customer_id = (int) $this->input->post('customer_id', true);
+        $loan_amount = (float) $this->input->post('loan_amount', true);
+        $loan_date = system_fromatted_date($this->input->post('loan_date', true));
+        $note = trim((string) $this->input->post('note', true));
+
+        if ($loan_id <= 0 || $customer_id <= 0 || $loan_amount <= 0 || !$this->is_valid_date($loan_date)) {
+            show_error('Invalid customer loan request.', 400);
+        }
+
+        $result = $this->customer_loans->update_loan($loan_id, $customer_id, $loan_amount, $loan_date, $note, $this->data);
 
         $this->session->set_flashdata($result['success'] ? 'success' : 'error', $result['message']);
         redirect(base_url('customer_loan_management'), 'refresh');

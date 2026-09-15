@@ -353,6 +353,14 @@
                                                     <span class="debit-amount">৳ <?= number_format($account_summary['total_invoice'], 2); ?></span>
                                                 </div>
                                                 <div class="summary-item-merged">
+                                                    <span>Customer Loans</span>
+                                                    <span class="debit-amount">৳ <?= number_format($account_summary['total_loan_issued'], 2); ?></span>
+                                                </div>
+                                                <div class="summary-item-merged">
+                                                    <span>Loan Repayments</span>
+                                                    <span class="credit-amount">৳ <?= number_format($account_summary['total_loan_repaid'], 2); ?></span>
+                                                </div>
+                                                <div class="summary-item-merged">
                                                     <span>Total Received</span>
                                                     <span class="credit-amount">৳ <?= number_format($account_summary['total_paid'], 2); ?></span>
                                                 </div>
@@ -434,6 +442,8 @@
                                         <?= $transaction->type == 'Sales Return' ? 'label-warning' : ''; ?>
                                         <?= $transaction->type == 'Opening Balance' ? 'label-info' : ''; ?>
                                         <?= $transaction->type == 'Return Payment' ? 'label-primary' : ''; ?>
+                                        <?= $transaction->type == 'Customer Loan' ? 'label-primary' : ''; ?>
+                                        <?= $transaction->type == 'Loan Repayment' ? 'label-success' : ''; ?>
                                     ">
                                                                     <?= $transaction->type; ?>
                                                                 </span>

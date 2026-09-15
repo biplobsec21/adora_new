@@ -4,6 +4,28 @@
 
 <head>
     <?php include __DIR__ . '/../comman/code_css_form.php'; ?>
+    <style>
+        @media print {
+
+            .no-print,
+            .main-header,
+            .main-sidebar,
+            .control-sidebar-bg,
+            footer {
+                display: none !important;
+            }
+
+            .content-wrapper {
+                margin-left: 0 !important;
+                min-height: 0 !important;
+            }
+
+            .box {
+                border-top: 0;
+                box-shadow: none;
+            }
+        }
+    </style>
 </head>
 
 <body class="hold-transition skin-blue sidebar-mini">
@@ -26,7 +48,7 @@
                 <div class="row">
                     <div class="col-md-12">
                         <?php include __DIR__ . '/../comman/code_flashdata.php'; ?>
-                        <div class="box box-info">
+                        <div class="box box-info no-print">
                             <div class="box-header with-border">
                                 <h3 class="box-title">Select Customer</h3>
                             </div>
@@ -52,33 +74,36 @@
                             <div class="box box-success">
                                 <div class="box-header with-border">
                                     <h3 class="box-title">Summary for <?= html_escape($customer['customer_name'] ?? 'Customer'); ?></h3>
+                                    <div class="box-tools">
+                                        <button type="button" class="btn btn-default btn-sm no-print" onclick="window.print();">
+                                            <i class="fa fa-print"></i> Print Statement
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="box-body">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="small-box bg-aqua">
-                                                <div class="inner">
-                                                    <h3><?= html_escape($CI->currency($summary['total_loan_amount'])); ?></h3>
-                                                    <p>Total Loan Amount</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="small-box bg-green">
-                                                <div class="inner">
-                                                    <h3><?= html_escape($CI->currency($summary['total_paid_amount'])); ?></h3>
-                                                    <p>Total Paid Amount</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="small-box bg-red">
-                                                <div class="inner">
-                                                    <h3><?= html_escape($CI->currency($summary['total_balance_amount'])); ?></h3>
-                                                    <p>Outstanding Balance</p>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Summary Item</th>
+                                                    <th class="text-right">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>Total Loan Amount</td>
+                                                    <td class="text-right"><?= html_escape($CI->currency($summary['total_loan_amount'])); ?></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Total Paid Amount</td>
+                                                    <td class="text-right"><?= html_escape($CI->currency($summary['total_paid_amount'])); ?></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Outstanding Balance</strong></td>
+                                                    <td class="text-right"><strong><?= html_escape($CI->currency($summary['total_balance_amount'])); ?></strong></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>

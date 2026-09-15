@@ -592,6 +592,9 @@ echo "<pre>";
                                   <input type="checkbox" class="customers_all" id='customer_loan_add' name="permission[customer_loan_add]"> Customer Loan Add
                                 </label></div>
                               <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="customers_all" id='customer_loan_edit' name="permission[customer_loan_edit]"> Customer Loan Edit
+                                </label></div>
+                              <div class="checkbox icheck"><label>
                                   <input type="checkbox" class="customers_all" id='customer_loan_repayment' name="permission[customer_loan_repayment]"> Customer Loan Repayment
                                 </label></div>
                               <div class="checkbox icheck"><label>

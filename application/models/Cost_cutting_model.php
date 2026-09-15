@@ -38,7 +38,8 @@ class Cost_cutting_model extends CI_Model
             ->where(array('customer_id' => $customer->id, 'status' => 1, 'sales_status' => 'Final'))
             ->where('grand_total > paid_amount')
             ->get('db_sales')->row();
-        $due_amount = max(0, (float) $customer->opening_balance - $opening_paid + (float) $sales_due->due);
+        $loan_due = $this->get_customer_loan_due($customer->id);
+        $due_amount = max(0, (float) $customer->opening_balance - $opening_paid + (float) $sales_due->due + $loan_due);
         $paid_amount = $opening_paid + (float) $this->db->select_sum('paid_amount')
             ->where(array('customer_id' => $customer->id, 'status' => 1, 'sales_status' => 'Final'))
             ->get('db_sales')->row()->paid_amount;
@@ -255,6 +256,106 @@ class Cost_cutting_model extends CI_Model
             }
             $amount -= $payment_amount;
         }
+
+        if ($amount > 0) {
+            $loans = $this->db->select('cl.*, COALESCE(SUM(CASE WHEN clt.transaction_type = "LOAN_ISSUE" THEN clt.amount WHEN clt.transaction_type = "REPAYMENT" THEN -clt.amount ELSE 0 END), 0) AS transaction_balance', false)
+                ->from('db_customer_loans cl')
+                ->join('db_customer_loan_transactions clt', 'clt.loan_id = cl.id', 'left')
+                ->where('cl.customer_id', (int) $customer_id)
+                ->where('cl.status', 'OPEN')
+                ->group_by('cl.id')
+                ->having('transaction_balance >', 0)
+                ->order_by('cl.loan_date', 'ASC')
+                ->order_by('cl.id', 'ASC')
+                ->get()->result();
+
+            foreach ($loans as $loan) {
+                if ($amount <= 0) {
+                    break;
+                }
+
+                $loan_balance = min((float) $loan->transaction_balance, $amount);
+                $new_paid_amount = (float) $loan->paid_amount + $loan_balance;
+                $new_balance_amount = max(0, (float) $loan->transaction_balance - $loan_balance);
+                $loan_status = $new_balance_amount <= 0 ? 'CLOSED' : 'OPEN';
+                $old_loan = (array) $loan;
+
+                if (!$this->db->where('id', (int) $loan->id)->update('db_customer_loans', array(
+                    'paid_amount' => $new_paid_amount,
+                    'balance_amount' => $new_balance_amount,
+                    'status' => $loan_status,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                    'updated_by' => $user_data['userid'] ?? 0,
+                ))) {
+                    return false;
+                }
+
+                if (!$this->db->insert('db_customer_loan_transactions', array(
+                    'loan_id' => (int) $loan->id,
+                    'customer_id' => (int) $customer_id,
+                    'transaction_type' => 'REPAYMENT',
+                    'amount' => $loan_balance,
+                    'transaction_date' => $payment_date,
+                    'payment_method' => 'Cost Cutting',
+                    'note' => $batch_number,
+                    'created_by' => $user_data['userid'] ?? 0,
+                    'created_date' => $user_data['CUR_DATE'],
+                    'created_time' => $user_data['CUR_TIME'],
+                    'created_at' => date('Y-m-d H:i:s'),
+                ))) {
+                    return false;
+                }
+
+                $transaction_id = $this->db->insert_id();
+                $updated_loan = $this->db->get_where('db_customer_loans', array('id' => (int) $loan->id))->row_array();
+                $this->write_loan_audit('db_customer_loans', (int) $loan->id, 'UPDATE', $old_loan, $updated_loan, $payment_date, $user_data);
+                $this->write_loan_audit('db_customer_loan_transactions', $transaction_id, 'INSERT', null, array(
+                    'loan_id' => (int) $loan->id,
+                    'customer_id' => (int) $customer_id,
+                    'transaction_type' => 'REPAYMENT',
+                    'amount' => $loan_balance,
+                    'transaction_date' => $payment_date,
+                    'payment_method' => 'Cost Cutting',
+                    'note' => $batch_number,
+                ), $payment_date, $user_data);
+
+                $amount -= $loan_balance;
+            }
+        }
         return true;
+    }
+
+    private function get_customer_loan_due($customer_id)
+    {
+        $loan_balance = $this->db->select('COALESCE(SUM(CASE WHEN transaction_type = "LOAN_ISSUE" THEN amount WHEN transaction_type = "REPAYMENT" THEN -amount ELSE 0 END), 0) AS balance', false)
+            ->where('customer_id', (int) $customer_id)
+            ->where_in('transaction_type', array('LOAN_ISSUE', 'REPAYMENT'))
+            ->get('db_customer_loan_transactions')->row();
+
+        return max(0, (float) $loan_balance->balance);
+    }
+
+    private function write_loan_audit($table_name, $record_id, $action, $old_value, $new_value, $affected_date, $user_data)
+    {
+        $audit = array(
+            'table_name' => $table_name,
+            'record_id' => $record_id,
+            'affected_date' => $affected_date,
+            'action' => $action,
+            'old_value' => json_encode($old_value),
+            'changed_by' => $user_data['CUR_USERNAME'] ?? ($user_data['userid'] ?? 'SYSTEM'),
+            'system_ip' => $user_data['SYSTEM_IP'] ?? $this->input->ip_address(),
+            'created_date' => date('Y-m-d'),
+            'created_time' => date('H:i:s'),
+            'created_at' => date('Y-m-d H:i:s'),
+        );
+
+        if ($this->db->field_exists('new_value', 'db_audit_logs')) {
+            $audit['new_value'] = json_encode($new_value);
+        } else {
+            $audit['old_value'] = json_encode(array('previous' => $old_value, 'new' => $new_value));
+        }
+
+        return $this->db->insert('db_audit_logs', $audit);
     }
 }

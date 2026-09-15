@@ -96,6 +96,14 @@ class Customer_ledger_model extends CI_Model
             $all_transactions[] = $cob_payment;
         }
 
+        // 7. Customer loans and repayments
+        $loan_transactions = $this->get_loan_transactions($customer_id, $db_start_date, $db_end_date);
+        foreach ($loan_transactions as $loan_transaction) {
+            $loan_transaction->type = $loan_transaction->transaction_type === 'REPAYMENT' ? 'Loan Repayment' : 'Customer Loan';
+            $loan_transaction->is_opening = false;
+            $all_transactions[] = $loan_transaction;
+        }
+
         // Replace the usort function with this more precise version:
         usort($all_transactions, function ($a, $b) {
             $timeA = strtotime($a->date);
@@ -109,7 +117,9 @@ class Customer_ledger_model extends CI_Model
                     'Sales Return' => 2,
                     'Payment' => 3,
                     'Return Payment' => 4,
-                    'Opening Balance Payment' => 5
+                    'Opening Balance Payment' => 5,
+                    'Customer Loan' => 6,
+                    'Loan Repayment' => 7
                 ];
                 return ($typeOrder[$a->type] ?? 999) - ($typeOrder[$b->type] ?? 999);
             }
@@ -134,6 +144,12 @@ class Customer_ledger_model extends CI_Model
                     break;
                 case 'Opening Balance Payment':
                     $running_balance -= $transaction->payment;
+                    break;
+                case 'Customer Loan':
+                    $running_balance += $transaction->amount;
+                    break;
+                case 'Loan Repayment':
+                    $running_balance -= $transaction->amount;
                     break;
             }
 
@@ -200,6 +216,15 @@ class Customer_ledger_model extends CI_Model
         $this->db->where('status', 1);
         $cob_payments = $this->db->get()->row();
         $balance -= $cob_payments->total_cob_payments;
+
+        // Customer loans increase the amount due; repayments reduce it.
+        $this->db->select('COALESCE(SUM(CASE WHEN transaction_type = "LOAN_ISSUE" THEN amount ELSE 0 END), 0) AS total_loan_issues,
+                   COALESCE(SUM(CASE WHEN transaction_type = "REPAYMENT" THEN amount ELSE 0 END), 0) AS total_loan_repayments');
+        $this->db->from('db_customer_loan_transactions');
+        $this->db->where('customer_id', $customer_id);
+        $this->db->where('transaction_date <', $start_date);
+        $loan_balance = $this->db->get()->row();
+        $balance += (float) $loan_balance->total_loan_issues - (float) $loan_balance->total_loan_repayments;
 
         return $balance;
     }
@@ -410,6 +435,35 @@ class Customer_ledger_model extends CI_Model
         return $cob_payments;
     }
 
+    // Get customer loan issues and repayments
+    private function get_loan_transactions($customer_id, $start_date, $end_date)
+    {
+        $this->db->select('id, loan_id, transaction_type, transaction_date AS date, amount,
+                           payment_method, note AS others,
+                           CONCAT("CL", YEAR(transaction_date), "/", id) AS reference_no');
+        $this->db->from('db_customer_loan_transactions');
+        $this->db->where('customer_id', $customer_id);
+        $this->db->where('transaction_date >=', $start_date);
+        $this->db->where('transaction_date <=', $end_date);
+        $this->db->where_in('transaction_type', ['LOAN_ISSUE', 'REPAYMENT']);
+        $this->db->where('amount >', 0);
+        $this->db->order_by('transaction_date', 'ASC');
+
+        $transactions = $this->db->get()->result();
+        foreach ($transactions as $transaction) {
+            $transaction->debit = $transaction->transaction_type === 'LOAN_ISSUE' ? $transaction->amount : 0;
+            $transaction->credit = $transaction->transaction_type === 'REPAYMENT' ? $transaction->amount : 0;
+            $transaction->location = '';
+            $transaction->payment_status = $transaction->transaction_type === 'REPAYMENT' ? 'Paid' : 'Issued';
+            $transaction->items = array();
+            if (empty($transaction->others)) {
+                $transaction->others = $transaction->transaction_type === 'REPAYMENT' ? 'Customer loan repayment' : 'Customer loan issued';
+            }
+        }
+
+        return $transactions;
+    }
+
     // Get account summary
     public function get_account_summary($customer_id, $start_date, $end_date)
     {
@@ -421,6 +475,8 @@ class Customer_ledger_model extends CI_Model
             'total_invoice' => 0,
             'total_paid' => 0,
             'total_cob_payments' => 0,
+            'total_loan_issued' => 0,
+            'total_loan_repaid' => 0,
             'advance_balance' => 0,
             'balance_due' => 0
         );
@@ -459,8 +515,18 @@ class Customer_ledger_model extends CI_Model
         $cob_result = $this->db->get()->row();
         $summary['total_cob_payments'] = $cob_result->total_cob_payments;
 
+        $this->db->select('COALESCE(SUM(CASE WHEN transaction_type = "LOAN_ISSUE" THEN amount ELSE 0 END), 0) AS total_loan_issued,
+                   COALESCE(SUM(CASE WHEN transaction_type = "REPAYMENT" THEN amount ELSE 0 END), 0) AS total_loan_repaid');
+        $this->db->from('db_customer_loan_transactions');
+        $this->db->where('customer_id', $customer_id);
+        $this->db->where('transaction_date >=', $db_start_date);
+        $this->db->where('transaction_date <=', $db_end_date);
+        $loan_result = $this->db->get()->row();
+        $summary['total_loan_issued'] = (float) $loan_result->total_loan_issued;
+        $summary['total_loan_repaid'] = (float) $loan_result->total_loan_repaid;
+
         // Balance due (including COB payments)
-        $summary['balance_due'] = $summary['opening_balance'] + $summary['total_invoice'] - $summary['total_paid'] - $summary['total_cob_payments'];
+        $summary['balance_due'] = $summary['opening_balance'] + $summary['total_invoice'] + $summary['total_loan_issued'] - $summary['total_paid'] - $summary['total_cob_payments'] - $summary['total_loan_repaid'];
 
         return $summary;
     }

@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS `db_due_generation_items` (
   `customer_name` varchar(150) DEFAULT NULL,
   `mobile` varchar(30) DEFAULT NULL,
   `previous_outstanding_amount` decimal(20,2) NOT NULL DEFAULT 0.00,
+  `loan_due_amount` decimal(20,2) NOT NULL DEFAULT 0.00,
   `new_due_amount` decimal(20,2) NOT NULL DEFAULT 0.00,
   `total_due_amount` decimal(20,2) NOT NULL DEFAULT 0.00,
   `actually_cut_amount` decimal(20,2) NOT NULL DEFAULT 0.00,
