@@ -146,7 +146,10 @@ class Sms_service_model extends CI_Model
 
             $log = $latest_log_by_customer[(int) $item->customer_id] ?? null;
             $status = $log ? $log->status : 'Not Sent';
-            $status_label = $status === 'Sent' ? 'Already Sent' : ($status === 'Failed' ? 'Resend' : ($status === 'Queued' ? 'Queued' : 'Not Sent'));
+            if (!$this->is_valid_mobile($mobile)) {
+                $status = 'Invalid Number';
+            }
+            $status_label = $status === 'Sent' ? 'Already Sent' : ($status === 'Failed' ? 'Resend' : ($status === 'Queued' ? 'Queued' : ($status === 'Invalid Number' ? 'Invalid Number' : 'Not Sent')));
             $rows[] = array(
                 'customer_id' => (int) $item->customer_id,
                 'customer_name' => $customer_name,
@@ -174,7 +177,7 @@ class Sms_service_model extends CI_Model
 
         $eligible_customer_ids = array();
         foreach ($preview['rows'] as $row) {
-            if (!empty($row['status']) && $row['status'] === 'Sent') continue;
+            if (!empty($row['status']) && in_array($row['status'], array('Sent', 'Invalid Number'), true)) continue;
             $eligible_customer_ids[(int) $row['customer_id']] = true;
         }
 
@@ -186,6 +189,7 @@ class Sms_service_model extends CI_Model
         $events = array();
         foreach ($this->due_generation->get_items($generation_id) as $item) {
             if (!isset($eligible_customer_ids[(int) $item->customer_id])) continue;
+            if (!$this->is_valid_mobile($item->mobile)) continue;
             $events[] = array('customer_id' => $item->customer_id, 'customer_name' => $item->customer_name, 'customer_number' => $item->customer_number, 'mobile' => $item->mobile, 'values' => array('due_month' => date('M Y', strtotime($generation->due_cycle_date)), 'total_due' => $item->total_due_amount, 'new_due' => $item->new_due_amount, 'remaining_due' => $item->remaining_due_amount), 'generation_id' => $generation_id, 'batch_id' => null);
         }
         $this->send_customer_events_batch('due_generation', $events, $user);
@@ -193,6 +197,14 @@ class Sms_service_model extends CI_Model
         $status = $failed > 0 ? ($failed < count($events) ? 'Partial' : 'Failed') : 'Sent';
         $this->db->where('id', (int) $generation_id)->update('db_due_generations', array('sms_status' => $status, 'sms_sent_at' => date('Y-m-d H:i:s')));
         return array('success' => $status === 'Sent', 'message' => $status === 'Sent' ? 'SMS sent successfully.' : 'SMS completed with failed recipients.');
+    }
+
+    private function is_valid_mobile($mobile)
+    {
+        $mobile = preg_replace('/[\s-]+/', '', trim((string) $mobile));
+        if (strpos($mobile, '+880') === 0) $mobile = '0' . substr($mobile, 4);
+        elseif (strpos($mobile, '880') === 0) $mobile = '0' . substr($mobile, 3);
+        return (bool) preg_match('/^01[3-9]\d{8}$/', $mobile);
     }
 
     public function send_due_generation($generation_id, $user)

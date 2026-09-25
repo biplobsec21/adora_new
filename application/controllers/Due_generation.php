@@ -75,9 +75,9 @@ class Due_generation extends MY_Controller
         header('Pragma: no-cache');
         header('Expires: 0');
         $output = fopen('php://output', 'w');
-        fputcsv($output, array('Customer Number', 'Customer Name', 'Previous Outstanding', 'New Due', 'Cutting Amount'));
+        fputcsv($output, array('Customer Number', 'Customer Name', 'Customer Address', 'Previous Outstanding', 'New Due', 'Cutting Amount'));
         foreach ($this->due_generation->get_items($generation->id) as $item) {
-            fputcsv($output, array($item->customer_number, $item->customer_name, $item->previous_outstanding_amount, $item->new_due_amount, $item->total_due_amount));
+            fputcsv($output, array($item->customer_number, $item->customer_name, $item->customer_address ?? '', $item->previous_outstanding_amount, $item->new_due_amount, $item->total_due_amount));
         }
         fclose($output);
         exit;

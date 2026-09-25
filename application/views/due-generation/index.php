@@ -119,12 +119,12 @@
                 $('#sms-recipient-count').text(response.rows.length);
                 var eligibleRows = 0;
                 $.each(response.rows, function(index, row) {
-                    if (row.status !== 'Sent') eligibleRows++;
+                    if (row.status !== 'Sent' && row.status !== 'Invalid Number') eligibleRows++;
                     rows.append('<tr><td>' + $('<div>').text(row.customer_name).html() + '</td><td>' + $('<div>').text(row.mobile).html() + '</td><td>' + $('<div>').text(row.message).html() + '</td><td>' + $('<div>').text(row.status_label || 'Not Sent').html() + '</td></tr>');
                 });
                 $('#sms-send-form').attr('action', '<?= $base_url; ?>due_generation/send_sms/' + id);
                 $('#confirm-sms-send').prop('disabled', eligibleRows === 0);
-                $('#confirm-sms-send').text(eligibleRows === 0 ? 'All SMS Already Sent' : 'Send Pending SMS');
+                $('#confirm-sms-send').text(eligibleRows === 0 ? 'No Valid SMS to Send' : 'Send Pending SMS');
                 $('#sms-preview-modal').modal('show');
             }).fail(function() {
                 error.text('SMS preview could not be loaded.').show();

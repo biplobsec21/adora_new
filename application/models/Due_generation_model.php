@@ -58,7 +58,7 @@ class Due_generation_model extends CI_Model
             if ($total <= 0) continue;
             $item = array('generation_id' => $generation_id, 'customer_id' => $customer->id, 'customer_number' => $customer->customer_number, 'customer_name' => $customer->customer_name, 'mobile' => $customer->mobile, 'previous_outstanding_amount' => $previous, 'loan_due_amount' => $loan_due, 'new_due_amount' => $new_due, 'total_due_amount' => $total, 'remaining_due_amount' => $total);
             $this->db->insert('db_due_generation_items', $item);
-            $rows[] = $item;
+            $rows[] = array_merge($item, array('customer_address' => $customer->address ?? ''));
             $summary['total_records']++;
             $summary['total_new_due'] += $new_due;
             $summary['total_previous_outstanding'] += $previous;
@@ -77,8 +77,8 @@ class Due_generation_model extends CI_Model
             $this->db->trans_rollback();
             return array('success' => false, 'message' => 'The DueFlow CSV file could not be created.');
         }
-        fputcsv($handle, array('Customer Number', 'Customer Name', 'Previous Outstanding', 'New Due', 'Cutting Amount'));
-        foreach ($rows as $row) fputcsv($handle, array($row['customer_number'], $row['customer_name'], $row['previous_outstanding_amount'], $row['new_due_amount'], $row['total_due_amount']));
+        fputcsv($handle, array('Customer Number', 'Customer Name', 'Customer Address', 'Previous Outstanding', 'New Due', 'Cutting Amount'));
+        foreach ($rows as $row) fputcsv($handle, array($row['customer_number'], $row['customer_name'], $row['customer_address'] ?? '', $row['previous_outstanding_amount'], $row['new_due_amount'], $row['total_due_amount']));
         fclose($handle);
         $this->db->where('id', $generation_id)->update('db_due_generations', $summary);
         if (!$this->db->trans_status()) {
@@ -125,7 +125,7 @@ class Due_generation_model extends CI_Model
             if ($opening_due <= 0) continue;
             $item = array('generation_id' => $generation_id, 'customer_id' => $customer->id, 'customer_number' => $customer->customer_number, 'customer_name' => $customer->customer_name, 'mobile' => $customer->mobile, 'previous_outstanding_amount' => 0, 'loan_due_amount' => $loan_due, 'new_due_amount' => $opening_due, 'total_due_amount' => $opening_due, 'remaining_due_amount' => $opening_due);
             $this->db->insert('db_due_generation_items', $item);
-            $rows[] = $item;
+            $rows[] = array_merge($item, array('customer_address' => $customer->address ?? ''));
             $summary['total_records']++;
             $summary['total_new_due'] += $opening_due;
             $summary['total_due_amount'] += $opening_due;
@@ -156,7 +156,12 @@ class Due_generation_model extends CI_Model
     }
     public function get_items($id)
     {
-        return $this->db->order_by('customer_name', 'ASC')->get_where('db_due_generation_items', array('generation_id' => (int) $id))->result();
+        return $this->db->select('i.*, COALESCE(c.customer_number, i.customer_number) AS customer_number, COALESCE(c.customer_name, i.customer_name) AS customer_name, COALESCE(c.mobile, i.mobile) AS mobile, c.address AS customer_address')
+            ->from('db_due_generation_items AS i')
+            ->join('db_customers AS c', 'c.id = i.customer_id', 'left')
+            ->where('i.generation_id', (int) $id)
+            ->order_by('customer_name', 'ASC')
+            ->get()->result();
     }
     public function mark_sent($id)
     {
@@ -285,8 +290,8 @@ class Due_generation_model extends CI_Model
         $file_path = $directory . $file_name;
         $handle = fopen($file_path, 'w');
         if (!$handle) return false;
-        fputcsv($handle, array('Customer Number', 'Customer Name', 'Previous Outstanding', 'New Due', 'Cutting Amount'));
-        foreach ($rows as $row) fputcsv($handle, array($row['customer_number'], $row['customer_name'], $row['previous_outstanding_amount'], $row['new_due_amount'], $row['total_due_amount']));
+        fputcsv($handle, array('Customer Number', 'Customer Name', 'Customer Address', 'Previous Outstanding', 'New Due', 'Cutting Amount'));
+        foreach ($rows as $row) fputcsv($handle, array($row['customer_number'], $row['customer_name'], $row['customer_address'] ?? '', $row['previous_outstanding_amount'], $row['new_due_amount'], $row['total_due_amount']));
         fclose($handle);
         return 'uploads/csv/due-generation/' . $file_name;
     }

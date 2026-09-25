@@ -31,6 +31,7 @@
                             <thead class="bg-primary">
                                 <tr>
                                     <th>Customer</th>
+                                    <th>Address</th>
                                     <th>Mobile</th>
                                     <th>Previous</th>
                                     <th>New Due</th>
@@ -42,6 +43,7 @@
                             </thead>
                             <tbody><?php foreach ($items as $item) { ?><tr>
                                         <td><?= html_escape($item->customer_number); ?> - <?= html_escape($item->customer_name); ?></td>
+                                        <td><?= html_escape($item->customer_address ?? ''); ?></td>
                                         <td><?= html_escape($item->mobile); ?></td>
                                         <td><?= app_number_format($item->previous_outstanding_amount); ?></td>
                                         <td><?= app_number_format($item->new_due_amount); ?></td>
