@@ -207,6 +207,42 @@ class Sms_service_model extends CI_Model
         return (bool) preg_match('/^01[3-9]\d{8}$/', $mobile);
     }
 
+    public function send_manual_customer_sms($customer_id, $message, $user)
+    {
+        $settings = $this->get_settings();
+        if (!(int) $settings->enabled) return array('success' => false, 'message' => 'SMS is disabled.');
+
+        $customer = $this->db->get_where('db_customers', array('id' => (int) $customer_id, 'status' => 1))->row();
+        $message = trim((string) $message);
+        if (!$customer) return array('success' => false, 'message' => 'Customer was not found.');
+        if ($message === '') return array('success' => false, 'message' => 'Please enter a message.');
+        if (!$this->is_valid_mobile($customer->mobile)) return array('success' => false, 'message' => 'The selected customer has an invalid mobile number.');
+
+        $this->db->insert('db_sms_logs', array(
+            'customer_id' => $customer->id,
+            'event_key' => 'manual_customer',
+            'recipient' => $customer->mobile,
+            'message_body' => $message,
+            'status' => 'Queued',
+            'sent_by' => $user['CUR_USERNAME'],
+        ));
+        $log_id = $this->db->insert_id();
+        $response = $this->call_provider($settings, $customer->mobile, $message);
+        $success = empty($response['error']);
+        $this->db->where('id', $log_id)->update('db_sms_logs', array(
+            'provider_code' => $response['code'],
+            'provider_response' => $response['body'],
+            'status' => $success ? 'Sent' : 'Failed',
+            'error_message' => $success ? null : $response['error'],
+            'sent_at' => date('Y-m-d H:i:s'),
+        ));
+
+        return array(
+            'success' => $success,
+            'message' => $success ? 'SMS sent successfully.' : ($response['error'] ?: 'SMS could not be sent.'),
+        );
+    }
+
     public function send_due_generation($generation_id, $user)
     {
         $settings = $this->get_settings();

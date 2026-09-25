@@ -46,7 +46,7 @@ class Due_generation_model extends CI_Model
         $customers = $this->db->where('status', 1)->order_by('customer_name', 'ASC')->get('db_customers')->result();
         $this->db->trans_begin();
         $generation_number = 'DF-' . date('YmdHis') . '-' . mt_rand(100, 999);
-        $this->db->insert('db_due_generations', array('generation_number' => $generation_number, 'due_cycle_date' => $cycle['due_cycle_date'], 'generation_type' => 'Monthly Cycle', 'cost_cutting_day' => (int) $settings->cost_cutting_day, 'billing_cycle_start' => $cycle['billing_cycle_start'], 'billing_cycle_end' => $cycle['billing_cycle_end'], 'file_name' => 'dueflow-' . $cycle['due_cycle_date'] . '.csv', 'file_path' => 'uploads/csv/due-generation/dueflow-' . $cycle['due_cycle_date'] . '.csv', 'generated_by' => $user_data['CUR_USERNAME'], 'system_ip' => $user_data['SYSTEM_IP']));
+        $this->db->insert('db_due_generations', array('generation_number' => $generation_number, 'due_cycle_date' => $cycle['due_cycle_date'], 'generation_type' => 'Monthly Cycle', 'cost_cutting_day' => (int) $settings->cost_cutting_day, 'billing_cycle_start' => $cycle['billing_cycle_start'], 'billing_cycle_end' => $cycle['billing_cycle_end'], 'file_name' => 'dueflow-' . $cycle['due_cycle_date'] . '.csv', 'file_path' => 'uploads/csv/due-generation/dueflow-' . $cycle['due_cycle_date'] . '.csv', 'generated_by' => $user_data['CUR_USERNAME'], 'generated_at' => date('Y-m-d H:i:s'), 'system_ip' => $user_data['SYSTEM_IP']));
         $generation_id = $this->db->insert_id();
         $rows = array();
         $summary = array('total_records' => 0, 'total_new_due' => 0, 'total_previous_outstanding' => 0, 'total_due_amount' => 0, 'total_remaining_due' => 0);
@@ -115,7 +115,7 @@ class Due_generation_model extends CI_Model
         $customers = $this->db->where('status', 1)->order_by('customer_name', 'ASC')->get('db_customers')->result();
         $this->db->trans_begin();
         $generation_number = 'DF-' . date('YmdHis') . '-' . mt_rand(100, 999);
-        $this->db->insert('db_due_generations', array('generation_number' => $generation_number, 'due_cycle_date' => $opening_date, 'generation_type' => 'Opening Balance', 'cost_cutting_day' => (int) $settings->cost_cutting_day, 'file_name' => 'dueflow-opening-' . $opening_date . '.csv', 'file_path' => 'uploads/csv/due-generation/dueflow-opening-' . $opening_date . '.csv', 'generated_by' => $user_data['CUR_USERNAME'], 'system_ip' => $user_data['SYSTEM_IP']));
+        $this->db->insert('db_due_generations', array('generation_number' => $generation_number, 'due_cycle_date' => $opening_date, 'generation_type' => 'Opening Balance', 'cost_cutting_day' => (int) $settings->cost_cutting_day, 'file_name' => 'dueflow-opening-' . $opening_date . '.csv', 'file_path' => 'uploads/csv/due-generation/dueflow-opening-' . $opening_date . '.csv', 'generated_by' => $user_data['CUR_USERNAME'], 'generated_at' => date('Y-m-d H:i:s'), 'system_ip' => $user_data['SYSTEM_IP']));
         $generation_id = $this->db->insert_id();
         $rows = array();
         $summary = array('total_records' => 0, 'total_new_due' => 0, 'total_previous_outstanding' => 0, 'total_due_amount' => 0, 'total_remaining_due' => 0);

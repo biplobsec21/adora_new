@@ -60,4 +60,6 @@ $route['damage'] = 'damage';
 $route['damage/add'] = 'damage/add';
 $route['damage/save'] = 'damage/save';
 $route['damage/approve/(:num)'] = 'damage/approve/$1';
+$route['send_sms_customer'] = 'send_sms_customer/index';
+$route['send_sms_customer/send'] = 'send_sms_customer/send';
 $route['ll/(:any)'] = 'sms_public/ledger/$1';
