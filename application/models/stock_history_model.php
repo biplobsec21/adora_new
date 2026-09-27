@@ -37,7 +37,7 @@ class Stock_history_model extends CI_Model
         }
 
         // Fall back to the stored item snapshot only if no transaction history exists.
-        if ((float) $summary['current_stock'] == 0) {
+        if (empty($transactions)) {
             $item = $this->db->select('stock as current_stock')->from('db_items')->where('id', $item_id)->get()->row();
             if ($item) {
                 $summary['current_stock'] = (float) $item->current_stock;
