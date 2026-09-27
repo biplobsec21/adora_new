@@ -95,3 +95,4 @@ A comprehensive customer account management system built with CodeIgniter that p
 - **File change**: - application/models/Customer_ledger_model.php
                    - application/views/customer_ledger.php
                    - application/controllers/Customers.php
+# adora_new
