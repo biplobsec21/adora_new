@@ -47,7 +47,7 @@ $config['base_url'] .= str_replace(basename($_SERVER['SCRIPT_NAME']), "", $_SERV
 | variable so that it is blank.
 |
 */
-$config['index_page'] = 'index.php';
+$config['index_page'] = '';
 
 // EOD starts from this date; activity before it is legacy history.
 $config['eod_start_date'] = '2026-09-13';
