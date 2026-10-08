@@ -55,6 +55,10 @@ class Customers extends MY_Controller
 		$data['page_title'] = $this->lang->line('customers');
 		$this->load->view('customer-payments', $data);
 	}
+	public function legacy_allpayments($id)
+	{
+		redirect('customers/allpayments/' . (int) $id);
+	}
 	public function update_customers()
 	{
 		$this->form_validation->set_rules('customer_name', 'Customer Name', 'trim|required');
@@ -120,7 +124,7 @@ class Customers extends MY_Controller
 
 			if ($this->permissions('customers_edit') && $customers->id != 1) {
 				$str2 .= '<li>
-                                    <a title="Edit Record ?" href="customers/update/' . $customers->id . '">
+                                    <a title="Edit Record ?" href="' . base_url('customers/update/' . $customers->id) . '">
                                         <i class="fa fa-fw fa-edit text-blue"></i>Edit
                                     </a>
                                 </li>';
@@ -137,7 +141,7 @@ class Customers extends MY_Controller
                 </a>
             </li>';
 			$str2 .= '<li>
-                                    <a title="Edit Record ?" href="customers/allpayments/' . $customers->id . '">
+                                    <a title="Customer Payments" href="' . base_url('customers/allpayments/' . $customers->id) . '">
                                     <i class="fa fa-fw fa-money text-blue"></i> Customer Payments
                                     </a>
                                 </li>';
@@ -266,8 +270,17 @@ class Customers extends MY_Controller
 	public function delete_opening_balance_entry()
 	{
 		$this->permission_check_with_msg('sales_payment_delete');
-		$entry_id = $this->input->post('entry_id');
-		echo $this->customers->delete_opening_balance_entry($entry_id);
+		$entry_id = (int) $this->input->post('entry_id');
+		$customer_id = (int) $this->input->post('customer_id');
+		echo $this->customers->delete_opening_balance_entry($entry_id, $customer_id);
+	}
+	public function delete_customer_sales_payment()
+	{
+		$this->permission_check_with_msg('sales_payment_delete');
+		$payment_id = (int) $this->input->post('payment_id');
+		$customer_id = (int) $this->input->post('customer_id');
+		$this->load->model('sales_model', 'sales');
+		echo $this->sales->delete_payment($payment_id, $customer_id);
 	}
 	public function getCustomers($id = '')
 	{

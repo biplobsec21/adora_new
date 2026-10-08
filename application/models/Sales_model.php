@@ -858,17 +858,47 @@ class Sales_model extends CI_Model
 	<?php
 
 	}
-	public function delete_payment($payment_id)
+	public function delete_payment($payment_id, $customer_id = null)
 	{
+		$payment_id = (int) $payment_id;
+		if ($payment_id < 1 || ($customer_id !== null && (int) $customer_id < 1)) {
+			return "failed";
+		}
+
 		$this->db->trans_begin();
-		$sales_id = $this->db->query("select sales_id from db_salespayments where id=$payment_id")->row()->sales_id;
+		$this->db->select('payment.sales_id, sales.customer_id, sales.sales_code')
+			->from('db_salespayments AS payment')
+			->join('db_sales AS sales', 'sales.id = payment.sales_id')
+			->where('payment.id', $payment_id);
+		if ($customer_id !== null) {
+			$this->db->where('sales.customer_id', (int) $customer_id);
+		}
+		$payment = $this->db->get()->row();
+		if (!$payment) {
+			$this->db->trans_rollback();
+			return "failed";
+		}
 
-		$customer_id = $this->db->query("select customer_id from db_sales where id=$sales_id")->row()->customer_id;
+		if ($customer_id !== null) {
+			$this->audit_log->snapshot('sales_payment', $payment_id, 'db_salespayments');
+		}
 
-		$q1 = $this->db->query("delete from db_salespayments where id='$payment_id'");
-		$q2 = $this->update_sales_payment_status($sales_id, $customer_id);
+		$q1 = $this->db->where('id', $payment_id)->delete('db_salespayments');
+		$q2 = $q1
+			? $this->update_sales_payment_status((int) $payment->sales_id, (int) $payment->customer_id)
+			: false;
+		$audit_logged = true;
+		if ($q1 && $q2 && $customer_id !== null) {
+			$audit_logged = $this->audit_log->log(
+				'sales_payment',
+				'delete',
+				$payment_id,
+				$payment->sales_code,
+				null
+			);
+		}
 
-		if (!$q1 || !$q2) {
+		if (!$q1 || !$q2 || !$audit_logged || !$this->db->trans_status()) {
 			$this->db->trans_rollback();
 			return "failed";
 		} else {

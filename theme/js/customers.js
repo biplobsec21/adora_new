@@ -287,7 +287,7 @@ function multi_delete(){
 }
 function pay_now(customer_id){
 
-  $.post($("#base_url").val().trim()+'customers/show_pay_now_modal', {customer_id: customer_id}, function(result) {
+  $.post(window.customerPaymentUrls.showPayNow, {customer_id: customer_id}, function(result) {
     $(".pay_now_modal").html('').html(result);
     //Date picker
     $('.datepicker').datepicker({
@@ -348,7 +348,7 @@ function save_payment(customer_id){
 
     //$(".box").append('<div class="overlay"><i class="fa fa-refresh fa-spin"></i></div>');
     //$(".payment_save").attr('disabled',true);  //Enable Save or Update button
-    $.post('customers/save_payment', {customer_id: customer_id,payment_type:payment_type,amount:amount,payment_date:payment_date,payment_note:payment_note}, function(result) {
+    $.post(window.customerPaymentUrls.savePayment, {customer_id: customer_id,payment_type:payment_type,amount:amount,payment_date:payment_date,payment_note:payment_note}, function(result) {
       result=result.trim();
   //alert(result);return;
         if(result=="success")
@@ -378,7 +378,7 @@ function save_payment(customer_id){
 
 function pay_return_due(customer_id){
 
-  $.post($("#base_url").val().trim()+'customers/show_pay_return_due_modal', {customer_id: customer_id}, function(result) {
+  $.post(window.customerPaymentUrls.showReturnDue, {customer_id: customer_id}, function(result) {
     $(".pay_return_due_modal").html('').html(result);
     //Date picker
     $('.datepicker').datepicker({
@@ -439,7 +439,7 @@ function save_return_due_payment(customer_id){
 
     //$(".box").append('<div class="overlay"><i class="fa fa-refresh fa-spin"></i></div>');
     //$(".payment_save").attr('disabled',true);  //Enable Save or Update button
-    $.post('customers/save_return_due_payment', {customer_id: customer_id,payment_type:payment_type,amount:amount,payment_date:payment_date,payment_note:payment_note}, function(result) {
+    $.post(window.customerPaymentUrls.saveReturnDue, {customer_id: customer_id,payment_type:payment_type,amount:amount,payment_date:payment_date,payment_note:payment_note}, function(result) {
       result=result.trim();
   //alert(result);return;
         if(result=="success")
@@ -467,28 +467,64 @@ function save_return_due_payment(customer_id){
     });
 }
 
-function delete_opening_balance_entry(entry_id){
- if(confirm("Do You Wants to Delete Record ?")){
-    var base_url=$("#base_url").val().trim();
-    $(".box").append('<div class="overlay"><i class="fa fa-refresh fa-spin"></i></div>');
-   $.post(base_url+"customers/delete_opening_balance_entry",{entry_id:entry_id,customer_id:$("#q_id").val()},function(result){
-   //alert(result);//return;
-   result=result.trim();
-     if(result=="success")
-        { 
+  function delete_opening_balance_entry(entry_id, customer_id){
+    if (confirm("Delete this opening-balance payment?")) {
+      var base_url = $("#base_url").val().trim();
+      customer_id = customer_id || $("#q_id").val();
+      $(".box").append('<div class="overlay"><i class="fa fa-refresh fa-spin"></i></div>');
+      $.post(base_url + "customers/delete_opening_balance_entry", {
+        entry_id: entry_id,
+        customer_id: customer_id
+      }, function (result) {
+        if (typeof result !== "string" || result.trim() === "") {
+          toastr["error"]("Unexpected server response. The payment was not confirmed as deleted.");
+          return;
+        }
+        result = result.trim();
+        if (result === "success") {
           location.reload(true);
-        }
-        else if(result=="failed"){
-          toastr["error"]("Failed to Delete .Try again!");
-          failed.currentTime = 0; 
-          failed.play();
-        }
-        else{
+        } else if (result === "failed") {
+          toastr["error"]("Failed to delete opening-balance payment. Please try again.");
+        } else {
           toastr["error"](result);
-          failed.currentTime = 0; 
-          failed.play();
         }
+      }).fail(function () {
+        toastr["error"]("Unable to delete opening-balance payment. Please try again.");
+      }).always(function () {
         $(".overlay").remove();
-   });
-   }//end confirmation   
+      });
+    }
   }
+
+function delete_customer_sales_payment(payment_id, customer_id) {
+  if (confirm("Delete this customer payment? The invoice balance will be recalculated.")) {
+    var base_url = $("#base_url").val().trim();
+    $(".box").append('<div class="overlay"><i class="fa fa-refresh fa-spin"></i></div>');
+    $.post(base_url + "customers/delete_customer_sales_payment", {
+      payment_id: payment_id,
+      customer_id: customer_id
+    }, function (result) {
+      if (typeof result !== "string") {
+        toastr["error"]("Unexpected server response. The payment was not confirmed as deleted.");
+        return;
+      }
+      result = result.trim();
+      if (result === "") {
+        toastr["error"]("The server returned an empty response. The payment was not confirmed as deleted.");
+        return;
+      }
+      if (result === "success") {
+        toastr["success"]("Payment deleted successfully.");
+        location.reload(true);
+      } else if (result === "failed") {
+        toastr["error"]("Failed to delete payment. Please try again.");
+      } else {
+        toastr["error"](result);
+      }
+    }).fail(function () {
+      toastr["error"]("Unable to delete payment. Please try again.");
+    }).always(function () {
+      $(".overlay").remove();
+    });
+  }
+}

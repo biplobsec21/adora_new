@@ -116,6 +116,8 @@ class MY_Controller extends CI_Controller
     'get_date_range_productions',
     'get_item_usage',
     'get_items_json',
+    'delete_customer_sales_payment',
+    'delete_opening_balance_entry',
   ];
 
   public function _remap($method, $params = [])

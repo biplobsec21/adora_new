@@ -356,7 +356,15 @@
     });
   </script>
 
-  <script src="<?php echo $theme_link; ?>js/customers.js"></script>
+  <script>
+    window.customerPaymentUrls = {
+      showPayNow: <?= json_encode(site_url('customers/show_pay_now_modal')); ?>,
+      savePayment: <?= json_encode(site_url('customers/save_payment')); ?>,
+      showReturnDue: <?= json_encode(site_url('customers/show_pay_return_due_modal')); ?>,
+      saveReturnDue: <?= json_encode(site_url('customers/save_return_due_payment')); ?>
+    };
+  </script>
+  <script src="<?php echo $theme_link; ?>js/customers.js?v=<?= filemtime(FCPATH . 'theme/js/customers.js'); ?>"></script>
   <!-- Make sidebar menu hughlighter/selector -->
   <script>
     $(".<?php echo basename(__FILE__, '.php'); ?>-active-li").addClass("active");

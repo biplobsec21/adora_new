@@ -88,17 +88,26 @@ class Eod_model extends CI_Model
         $offset = ($page - 1) * $per_page;
 
         if ($type === 'collected_cash') {
-            $from = 'db_salespayments';
+            $from = "(
+                SELECT id, sales_id, NULL AS customer_id, 'Sales invoice' AS source,
+                       payment_date, payment_type, payment, payment_note, created_by, status
+                FROM db_salespayments
+                UNION ALL
+                SELECT id, NULL AS sales_id, customer_id, 'Opening balance' AS source,
+                       payment_date, payment_type, payment, payment_note, created_by, status
+                FROM db_cobpayments
+            ) AS collected_payments";
             $where = 'payment_date = ? AND status = 1 AND payment > 0';
             $params = array($closing_date);
             $count_sql = "SELECT COUNT(*) AS total FROM {$from} WHERE {$where}";
             $total_sql = "SELECT COALESCE(SUM(payment), 0) AS total_amount FROM {$from} WHERE {$where}";
-            $data_sql = "SELECT id, sales_id, payment_date AS transaction_date,
+            $data_sql = "SELECT id, source, sales_id, customer_id,
+                                payment_date AS transaction_date,
                                 payment_type, payment AS amount, payment_note AS note,
                                 created_by
                          FROM {$from}
                          WHERE {$where}
-                         ORDER BY id DESC
+                         ORDER BY id DESC, source ASC
                          LIMIT {$per_page} OFFSET {$offset}";
         } elseif ($type === 'purchase_payments') {
             $from = 'db_purchasepayments';
@@ -298,6 +307,10 @@ class Eod_model extends CI_Model
                 WHERE payment_date < ? AND status = 1
                 UNION
                 SELECT payment_date AS activity_date
+                FROM db_cobpayments
+                WHERE payment_date < ? AND status = 1
+                UNION
+                SELECT payment_date AS activity_date
                 FROM db_purchasepayments
                 WHERE payment_date < ? AND status = 1
                 UNION
@@ -308,7 +321,7 @@ class Eod_model extends CI_Model
              LEFT JOIN db_daily_closing AS closing ON closing.closing_date = activity_dates.activity_date
                          WHERE closing.id IS NULL
                              AND activity_dates.activity_date >= ?",
-            array($current_date, $current_date, $current_date, $current_date, $current_date, $start_date)
+            array($current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $start_date)
         )->row();
 
         return $query ? $query->pending_date : null;
@@ -337,17 +350,8 @@ class Eod_model extends CI_Model
             );
         }
 
-        $live_payment = $this->db->query(
-            "SELECT COALESCE(SUM(payment), 0) AS live_total_cash_collected
-             FROM db_salespayments
-             WHERE payment_date = ?
-               AND status = 1
-               AND payment > 0",
-            array($previous_date)
-        )->row();
-
         $saved_total_cash_collected = (float) $previous_closing->total_cash_collected;
-        $live_total_cash_collected = (float) $live_payment->live_total_cash_collected;
+        $live_total_cash_collected = $this->get_total_cash_collected($previous_date);
         $late_amount = max(0, $live_total_cash_collected - $saved_total_cash_collected);
 
         return array(
@@ -556,15 +560,7 @@ class Eod_model extends CI_Model
         )->row();
         $summary['total_sales_due'] = (float) $sales->total_sales_due;
 
-        $payments = $this->db->query(
-            "SELECT COALESCE(SUM(payment), 0) AS total_cash_collected
-             FROM db_salespayments
-             WHERE payment_date = ?
-               AND status = 1
-               AND payment > 0",
-            array($closing_date)
-        )->row();
-        $summary['total_cash_collected'] = (float) $payments->total_cash_collected;
+        $summary['total_cash_collected'] = $this->get_total_cash_collected($closing_date);
 
         $purchase_payments = $this->db->query(
             "SELECT COALESCE(SUM(payment), 0) AS total_purchase_paid
@@ -624,6 +620,24 @@ class Eod_model extends CI_Model
             - $summary['custom_cash_deductions'];
 
         return $summary;
+    }
+
+    private function get_total_cash_collected($payment_date)
+    {
+        $payments = $this->db->query(
+            "SELECT
+                (SELECT COALESCE(SUM(payment), 0)
+                 FROM db_salespayments
+                 WHERE payment_date = ? AND status = 1 AND payment > 0)
+                +
+                (SELECT COALESCE(SUM(payment), 0)
+                 FROM db_cobpayments
+                 WHERE payment_date = ? AND status = 1 AND payment > 0)
+                AS total_cash_collected",
+            array($payment_date, $payment_date)
+        )->row();
+
+        return (float) $payments->total_cash_collected;
     }
 
     public function get_opening_cash($closing_date)

@@ -39,7 +39,7 @@
                            <select class="form-control select2" id="filter_module" style="width:100%">
                               <option value="">— All Modules —</option>
                               <?php
-                              $modules = ['sales','purchase','sales_return','purchase_return','damage','items','customers','suppliers','expense','users','roles'];
+                              $modules = ['sales','sales_payment','opening_balance_payment','purchase','sales_return','purchase_return','damage','items','customers','suppliers','expense','users','roles'];
                               foreach ($modules as $m) {
                                  echo "<option value='{$m}'>" . ucfirst(str_replace('_',' ',$m)) . "</option>";
                               }

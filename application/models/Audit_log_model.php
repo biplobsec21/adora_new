@@ -112,11 +112,10 @@ class Audit_log_model extends CI_Model
                 'created_at'     => date('Y-m-d H:i:s'),
             ];
 
-            $this->db->insert('db_audit_log', $entry);
-            return true;
+            return (bool) $this->db->insert('db_audit_log', $entry);
 
         } catch (Exception $e) {
-            // Audit failure must never break the main operation
+            // Report the failure so the calling operation can decide whether to roll back.
             log_message('error', 'Audit log failed: ' . $e->getMessage());
             return false;
         }

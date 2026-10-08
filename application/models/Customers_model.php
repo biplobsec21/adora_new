@@ -511,116 +511,115 @@ class Customers_model extends CI_Model
 
 	public function save_payment()
 	{
-		$this->db->trans_begin();
 		extract($this->security->xss_clean(html_escape(array_merge($this->data, $_POST, $_GET))));
 
 		$this->load->model('sales_model');
 
-		if ($amount === '' || $amount === 0) {
-			$amount = null;
+		$customer_id = isset($customer_id) ? (int) $customer_id : 0;
+		$amount = isset($amount) && is_numeric($amount) ? round((float) $amount, 2) : 0;
+		if ($customer_id < 1 || $amount <= 0 || empty($payment_type) || empty($payment_date)) {
+			return "Please Enter Valid Amount!";
 		}
 
-		if ($amount > 0 && !empty($payment_type)) {
+		$this->db->trans_begin();
+		$customer = $this->db->get_where('db_customers', array('id' => $customer_id, 'status' => 1))->row();
+		if (!$customer) {
+			$this->db->trans_rollback();
+			return "Customer not found.";
+		}
 
-			//Get Opening Balance
-			$q2 = $this->db->query("select * from db_customers where id=$customer_id");
-			$res2 = $q2->row();
-			$customer_opening_balance = $res2->opening_balance;
+		$opening_payments = $this->db->select_sum('payment')
+			->where(array('customer_id' => $customer_id, 'status' => 1))
+			->get('db_cobpayments');
+		$sales_query = $this->db->query(
+			"SELECT id, grand_total, paid_amount,
+			        GREATEST(COALESCE(grand_total, 0) - COALESCE(paid_amount, 0), 0) AS sales_due
+			 FROM db_sales
+			 WHERE customer_id = ?
+			   AND status = 1
+			   AND sales_status = 'Final'
+			   AND COALESCE(grand_total, 0) > COALESCE(paid_amount, 0)
+			 ORDER BY sales_date ASC, id ASC",
+			array($customer_id)
+		);
+		if (!$opening_payments || !$sales_query) {
+			$this->db->trans_rollback();
+			return "failed";
+		}
+		$opening_paid = (float) $opening_payments->row()->payment;
+		$opening_due = max(0, round((float) $customer->opening_balance - $opening_paid, 2));
+		$sales = $sales_query->result();
 
-			// Use calculated sales due instead of stored value
-			$customer_sales_due = $this->get_calculated_sales_due($customer_id);
+		$total_due = $opening_due;
+		foreach ($sales as $sale) {
+			$total_due = round($total_due + (float) $sale->sales_due, 2);
+		}
+		if ($amount > $total_due) {
+			$this->db->trans_rollback();
+			return "Payment amount exceeds the customer's outstanding balance.";
+		}
 
-			$sum_of_ob_paid = $this->db->query("select coalesce(sum(payment),0) sum_of_ob_paid from db_cobpayments where customer_id=$customer_id")->row()->sum_of_ob_paid;
-			$customer_opening_balance_due = $customer_opening_balance - $sum_of_ob_paid;
-
-			while ($amount > 0) {
-				//Adjust Opening Balance
-				if ($amount <= $customer_opening_balance_due && $customer_opening_balance_due > 0) {
-					$row_data = array(
-						'customer_id' 		=> $customer_id,
-						'payment_date'		=> date("Y-m-d", strtotime($payment_date)),
-						'payment_type' 		=> $payment_type,
-						'payment' 			=> $amount,
-						'payment_note' 		=> $payment_note,
-						'created_date' 		=> $CUR_DATE,
-						'created_time' 		=> $CUR_TIME,
-						'created_by' 		=> $CUR_USERNAME,
-						'system_ip' 		=> $SYSTEM_IP,
-						'system_name' 		=> $SYSTEM_NAME,
-						'status' 			=> 1,
-					);
-					$q3 = $this->db->insert('db_cobpayments', $row_data);
-					$amount = 0;
-				}
-				if ($amount >= $customer_opening_balance_due && $customer_opening_balance_due) {
-					$row_data = array(
-						'customer_id' 		=> $customer_id,
-						'payment_date'		=> date("Y-m-d", strtotime($payment_date)),
-						'payment_type' 		=> $payment_type,
-						'payment' 			=> $customer_opening_balance_due,
-						'payment_note' 		=> $payment_note,
-						'created_date' 		=> $CUR_DATE,
-						'created_time' 		=> $CUR_TIME,
-						'created_by' 		=> $CUR_USERNAME,
-						'system_ip' 		=> $SYSTEM_IP,
-						'system_name' 		=> $SYSTEM_NAME,
-						'status' 			=> 1,
-					);
-					$q3 = $this->db->insert('db_cobpayments', $row_data);
-					$amount -= $customer_opening_balance_due;
-				}
-
-				//Set Sales Payments
-				if ($amount <= $customer_sales_due) {
-					$qs4 = $this->db->query("select id,grand_total,paid_amount,coalesce(grand_total-paid_amount,0) as sales_due from db_sales where grand_total <> paid_amount and customer_id=" . $customer_id);
-					foreach ($qs4->result() as $res) {
-						$grand_total = $res->grand_total;
-						$paid_amount = $res->paid_amount;
-						$sales_due = $res->sales_due;
-						$sales_id = $res->id;
-						if ($amount <= $sales_due && $sales_due > 0) {
-							$salespayments_entry = array(
-								'sales_id' 		=> $sales_id,
-								'payment_date'		=> date("Y-m-d", strtotime($payment_date)),
-								'payment_type' 		=> $payment_type,
-								'payment' 			=> $amount,
-								'payment_note' 		=> $payment_note,
-								'created_date' 		=> $CUR_DATE,
-								'created_time' 		=> $CUR_TIME,
-								'created_by' 		=> $CUR_USERNAME,
-								'system_ip' 		=> $SYSTEM_IP,
-								'system_name' 		=> $SYSTEM_NAME,
-								'status' 			=> 1,
-							);
-							$amount = 0;
-						}
-						if ($amount >= $sales_due && $sales_due > 0) {
-							$salespayments_entry = array(
-								'sales_id' 		=> $sales_id,
-								'payment_date'		=> date("Y-m-d", strtotime($payment_date)),
-								'payment_type' 		=> $payment_type,
-								'payment' 			=> $sales_due,
-								'payment_note' 		=> $payment_note,
-								'created_date' 		=> $CUR_DATE,
-								'created_time' 		=> $CUR_TIME,
-								'created_by' 		=> $CUR_USERNAME,
-								'system_ip' 		=> $SYSTEM_IP,
-								'system_name' 		=> $SYSTEM_NAME,
-								'status' 			=> 1,
-							);
-							$amount -= $sales_due;
-						}
-
-						$q3 = $this->db->insert('db_salespayments', $salespayments_entry);
-						$q10 = $this->sales_model->update_sales_payment_status($sales_id, $customer_id);
-						if (!$q10) {
-							return "failed";
-						}
-					}
-				}
+		$remaining = $amount;
+		$payment_date = date('Y-m-d', strtotime($payment_date));
+		if ($remaining > 0 && $opening_due > 0) {
+			$opening_payment = min($remaining, $opening_due);
+			$inserted = $this->db->insert('db_cobpayments', array(
+				'customer_id' => $customer_id,
+				'payment_date' => $payment_date,
+				'payment_type' => $payment_type,
+				'payment' => $opening_payment,
+				'payment_note' => $payment_note,
+				'created_date' => $CUR_DATE,
+				'created_time' => $CUR_TIME,
+				'created_by' => $CUR_USERNAME,
+				'system_ip' => $SYSTEM_IP,
+				'system_name' => $SYSTEM_NAME,
+				'status' => 1,
+			));
+			if (!$inserted) {
+				$this->db->trans_rollback();
+				return "failed";
 			}
-		} else {
-			return "Please Enter Valid Amount!";
+			$remaining = round($remaining - $opening_payment, 2);
+		}
+
+		foreach ($sales as $sale) {
+			if ($remaining <= 0) {
+				break;
+			}
+
+			$sales_due = round((float) $sale->sales_due, 2);
+			if ($sales_due <= 0) {
+				continue;
+			}
+			$sales_payment = min($remaining, $sales_due);
+			if ($sales_payment <= 0) {
+				continue;
+			}
+
+			$inserted = $this->db->insert('db_salespayments', array(
+				'sales_id' => (int) $sale->id,
+				'payment_date' => $payment_date,
+				'payment_type' => $payment_type,
+				'payment' => $sales_payment,
+				'payment_note' => $payment_note,
+				'created_date' => $CUR_DATE,
+				'created_time' => $CUR_TIME,
+				'created_by' => $CUR_USERNAME,
+				'system_ip' => $SYSTEM_IP,
+				'system_name' => $SYSTEM_NAME,
+				'status' => 1,
+			));
+			if (!$inserted || !$this->sales_model->update_sales_payment_status((int) $sale->id, $customer_id)) {
+				$this->db->trans_rollback();
+				return "failed";
+			}
+			$remaining = round($remaining - $sales_payment, 2);
+		}
+
+		if ($remaining > 0 || !$this->db->trans_status()) {
+			$this->db->trans_rollback();
+			return "failed";
 		}
 
 		$this->db->trans_commit();
@@ -855,16 +854,42 @@ class Customers_model extends CI_Model
 		return "success";
 	}
 
-	public function delete_opening_balance_entry($entry_id)
+	public function delete_opening_balance_entry($entry_id, $customer_id)
 	{
-		$customer_id = $this->input->post('customer_id');
-		$this->db->trans_begin();
-		$q1 = $this->db->query("delete from db_cobpayments where id=$entry_id");
-		if (!$q1) {
+		$entry_id = (int) $entry_id;
+		$customer_id = (int) $customer_id;
+		if ($entry_id < 1 || $customer_id < 1) {
 			return "failed";
 		}
-		$this->session->set_flashdata('success', 'Success!! Opening Balance Entry Deleted!');
+
+		$this->db->trans_begin();
+		$payment = $this->db->get_where('db_cobpayments', array(
+			'id' => $entry_id,
+			'customer_id' => $customer_id,
+		))->row_array();
+		if (!$payment) {
+			$this->db->trans_rollback();
+			return "failed";
+		}
+
+		$this->audit_log->snapshot('opening_balance_payment', $entry_id, 'db_cobpayments');
+		$deleted = $this->db->where(array(
+			'id' => $entry_id,
+			'customer_id' => $customer_id,
+		))->delete('db_cobpayments');
+		$audit_logged = $deleted && $this->audit_log->log(
+			'opening_balance_payment',
+			'delete',
+			$entry_id,
+			'Customer ' . $customer_id,
+			null
+		);
+		if (!$deleted || !$audit_logged || !$this->db->trans_status()) {
+			$this->db->trans_rollback();
+			return "failed";
+		}
 		$this->db->trans_commit();
+		$this->session->set_flashdata('success', 'Success!! Opening Balance Entry Deleted!');
 		return "success";
 	}
 

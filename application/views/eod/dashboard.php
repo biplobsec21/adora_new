@@ -369,7 +369,9 @@
                 if (response.type === 'collected_cash') {
                     columns = [
                         ['transaction_date', 'Date'],
+                        ['source', 'Source'],
                         ['sales_id', 'Sales ID'],
+                        ['customer_id', 'Customer ID'],
                         ['payment_type', 'Payment Type'],
                         ['amount', 'Amount'],
                         ['note', 'Note'],

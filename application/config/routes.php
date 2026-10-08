@@ -55,6 +55,7 @@ $route['translate_uri_dashes'] = FALSE;
 $route['license/renew'] = 'License/renew';
 $route['license/submit_transaction'] = 'License/submit_transaction';
 $route['license/thanks_image'] = 'License/thanks_image';
+$route['customers/customers/allpayments/(:num)'] = 'customers/legacy_allpayments/$1';
 
 $route['damage'] = 'damage';
 $route['damage/add'] = 'damage/add';
