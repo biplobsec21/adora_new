@@ -89,25 +89,31 @@ class Eod_model extends CI_Model
 
         if ($type === 'collected_cash') {
             $from = "(
-                SELECT id, sales_id, NULL AS customer_id, 'Sales invoice' AS source,
-                       payment_date, payment_type, payment, payment_note, created_by, status
-                FROM db_salespayments
+                SELECT payment.id, payment.sales_id, sales.customer_id, 'Sales invoice' AS source,
+                       payment.payment_date, payment.payment_type, payment.payment,
+                       payment.payment_note, payment.created_by, payment.status
+                FROM db_salespayments AS payment
+                LEFT JOIN db_sales AS sales ON sales.id = payment.sales_id
                 UNION ALL
                 SELECT id, NULL AS sales_id, customer_id, 'Opening balance' AS source,
                        payment_date, payment_type, payment, payment_note, created_by, status
                 FROM db_cobpayments
             ) AS collected_payments";
-            $where = 'payment_date = ? AND status = 1 AND payment > 0';
+            $where = 'collected_payments.payment_date = ? AND collected_payments.status = 1 AND collected_payments.payment > 0';
             $params = array($closing_date);
             $count_sql = "SELECT COUNT(*) AS total FROM {$from} WHERE {$where}";
-            $total_sql = "SELECT COALESCE(SUM(payment), 0) AS total_amount FROM {$from} WHERE {$where}";
-            $data_sql = "SELECT id, source, sales_id, customer_id,
-                                payment_date AS transaction_date,
-                                payment_type, payment AS amount, payment_note AS note,
-                                created_by
+            $total_sql = "SELECT COALESCE(SUM(collected_payments.payment), 0) AS total_amount FROM {$from} WHERE {$where}";
+            $data_sql = "SELECT collected_payments.id, collected_payments.source, collected_payments.sales_id,
+                                customer.customer_name,
+                                collected_payments.payment_date AS transaction_date,
+                                collected_payments.payment_type,
+                                collected_payments.payment AS amount,
+                                collected_payments.payment_note AS note,
+                                collected_payments.created_by
                          FROM {$from}
+                         LEFT JOIN db_customers AS customer ON customer.id = collected_payments.customer_id
                          WHERE {$where}
-                         ORDER BY id DESC, source ASC
+                         ORDER BY collected_payments.id DESC, collected_payments.source ASC
                          LIMIT {$per_page} OFFSET {$offset}";
         } elseif ($type === 'purchase_payments') {
             $from = 'db_purchasepayments';

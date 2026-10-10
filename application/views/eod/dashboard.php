@@ -371,7 +371,7 @@
                         ['transaction_date', 'Date'],
                         ['source', 'Source'],
                         ['sales_id', 'Sales ID'],
-                        ['customer_id', 'Customer ID'],
+                        ['customer_name', 'Customer Name'],
                         ['payment_type', 'Payment Type'],
                         ['amount', 'Amount'],
                         ['note', 'Note'],
