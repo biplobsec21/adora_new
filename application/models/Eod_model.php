@@ -375,43 +375,38 @@ class Eod_model extends CI_Model
         }
 
         $previous_date = date('Y-m-d', strtotime($closing_date . ' -1 day'));
-        $previous_closing = $this->db->get_where('db_daily_closing', array('closing_date' => $previous_date))->row();
-
-        if (!$previous_closing) {
+        $summary = $this->get_closing_mismatch_summary($previous_date);
+        if (empty($summary)) {
             return array();
         }
 
-        $live_summary = $this->get_live_summary($previous_date);
+        $summary['previous_date'] = $previous_date;
+        return $summary;
+    }
+
+    public function get_closing_mismatch_summary($closing_date)
+    {
+        $closing = $this->db->get_where('db_daily_closing', array('closing_date' => $closing_date))->row();
+        if (!$closing) {
+            return array();
+        }
+
+        $live_summary = $this->get_live_summary($closing_date);
         $stored_summary = array(
-            'total_sales_due' => (float) $previous_closing->total_sales_due,
-            'total_cash_collected' => (float) $previous_closing->total_cash_collected,
-            'total_purchase_paid' => (float) $previous_closing->total_purchase_paid,
-            'total_loan_given' => (float) $previous_closing->total_loan_given,
-            'total_loan_repayments_received' => (float) $previous_closing->total_loan_repayments_received,
-            'total_expenses' => (float) $previous_closing->total_expenses,
-            'custom_cash_additions' => (float) $previous_closing->custom_cash_additions,
-            'custom_cash_deductions' => (float) $previous_closing->custom_cash_deductions,
-            'final_cash_in_hand' => (float) $previous_closing->final_cash_in_hand,
+            'total_sales_due' => (float) $closing->total_sales_due,
+            'total_cash_collected' => (float) $closing->total_cash_collected,
+            'total_purchase_paid' => (float) $closing->total_purchase_paid,
+            'total_loan_given' => (float) $closing->total_loan_given,
+            'total_loan_repayments_received' => (float) $closing->total_loan_repayments_received,
+            'total_expenses' => (float) $closing->total_expenses,
+            'custom_cash_additions' => (float) $closing->custom_cash_additions,
+            'custom_cash_deductions' => (float) $closing->custom_cash_deductions,
+            'final_cash_in_hand' => (float) $closing->final_cash_in_hand,
         );
-
-        $mismatch_fields = array(
-            'total_sales_due',
-            'total_cash_collected',
-            'total_purchase_paid',
-            'total_loan_given',
-            'total_loan_repayments_received',
-            'total_expenses',
-            'custom_cash_additions',
-            'custom_cash_deductions',
-            'final_cash_in_hand',
-        );
-
         $mismatch_details = array();
-        foreach ($mismatch_fields as $field) {
-            $stored_value = isset($stored_summary[$field]) ? (float) $stored_summary[$field] : 0;
-            $live_value = isset($live_summary[$field]) ? (float) $live_summary[$field] : 0;
-
-            if ((float) $stored_value !== (float) $live_value) {
+        foreach ($stored_summary as $field => $stored_value) {
+            $live_value = (float) $live_summary[$field];
+            if (round($stored_value, 2) !== round($live_value, 2)) {
                 $mismatch_details[] = array(
                     'field' => $field,
                     'stored_value' => $stored_value,
@@ -425,7 +420,7 @@ class Eod_model extends CI_Model
         }
 
         return array(
-            'previous_date' => $previous_date,
+            'closing_date' => $closing_date,
             'mismatch_details' => $mismatch_details,
             'live_summary' => $live_summary,
             'stored_summary' => $stored_summary,
@@ -499,7 +494,7 @@ class Eod_model extends CI_Model
         return array('success' => true, 'message' => 'Day closed successfully.');
     }
 
-    public function reclose_day($closing_date, $closing_type, $created_by, $system_ip)
+    public function reclose_day($closing_date, $created_by, $system_ip)
     {
         $this->db->trans_begin();
 
@@ -520,7 +515,6 @@ class Eod_model extends CI_Model
             'custom_cash_additions' => (float) $summary['custom_cash_additions'],
             'custom_cash_deductions' => (float) $summary['custom_cash_deductions'],
             'final_cash_in_hand' => (float) $summary['final_cash_in_hand'],
-            'closing_type' => $closing_type,
             'created_by' => $created_by,
             'system_ip' => $system_ip,
             'created_date' => date('Y-m-d'),
@@ -536,7 +530,11 @@ class Eod_model extends CI_Model
         }
 
         $this->db->trans_commit();
-        return array('success' => true, 'message' => 'Day refreshed successfully.');
+        return array(
+            'success' => true,
+            'message' => 'Day refreshed successfully.',
+            'total_cash_collected' => (float) $new_value['total_cash_collected'],
+        );
     }
 
     public function get_live_summary($closing_date)

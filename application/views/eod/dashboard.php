@@ -56,6 +56,38 @@
                             <?php } ?>
                         </ul>
                         <p><a href="<?= $base_url; ?>eod?date=<?= rawurlencode($late_entry['previous_date']); ?>" class="btn btn-info btn-sm"><i class="fa fa-calendar"></i> Open <?= html_escape($late_entry['previous_date']); ?> EOD</a></p>
+                        <?php if ($CI->permissions('eod_edit_closed_data')) { ?>
+                            <?= form_open('eod/refresh_day', array('class' => 'form-inline')); ?>
+                            <input type="hidden" name="closing_date" value="<?= html_escape($late_entry['previous_date']); ?>">
+                            <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Update the saved EOD snapshot for <?= html_escape($late_entry['previous_date']); ?> from live transactions? This change will be audited.');">
+                                <i class="fa fa-refresh"></i> Update Late Entry
+                            </button>
+                            <?= form_close(); ?>
+                        <?php } ?>
+                    </div>
+                <?php } ?>
+
+                <?php if (!empty($closing_mismatch)) { ?>
+                    <div class="callout callout-warning">
+                        <h4><i class="fa fa-exclamation-triangle"></i> This EOD snapshot is out of sync</h4>
+                        <p>Live transactions for <?= html_escape($closing_mismatch['closing_date']); ?> differ from the saved closing totals.</p>
+                        <ul>
+                            <?php foreach ($closing_mismatch['mismatch_details'] as $detail) { ?>
+                                <li>
+                                    <?= html_escape(str_replace('_', ' ', $detail['field'])); ?>:
+                                    live <?= $CI->currency(number_format((float) $detail['live_value'], 2, '.', '')); ?>
+                                    vs saved <?= $CI->currency(number_format((float) $detail['stored_value'], 2, '.', '')); ?>
+                                </li>
+                            <?php } ?>
+                        </ul>
+                        <?php if ($CI->permissions('eod_edit_closed_data')) { ?>
+                            <?= form_open('eod/refresh_day', array('class' => 'form-inline')); ?>
+                            <input type="hidden" name="closing_date" value="<?= html_escape($summary['closing_date']); ?>">
+                            <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Refresh the saved EOD snapshot from live transactions? This change will be audited.');">
+                                <i class="fa fa-refresh"></i> Refresh EOD Snapshot
+                            </button>
+                            <?= form_close(); ?>
+                        <?php } ?>
                     </div>
                 <?php } ?>
 

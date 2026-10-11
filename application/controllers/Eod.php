@@ -29,6 +29,7 @@ class Eod extends MY_Controller
         $data = $this->data;
         $data['page_title'] = 'End of Day';
         $data['summary'] = $this->eod->get_summary($closing_date);
+        $data['closing_mismatch'] = $this->eod->get_closing_mismatch_summary($closing_date);
         $data['late_entry'] = $this->eod->get_late_entry_summary($closing_date);
         $data['adjustments'] = $this->permissions('eod_adjustment_view')
             ? $this->eod->get_adjustments($closing_date)
@@ -156,6 +157,24 @@ class Eod extends MY_Controller
         }
         $result = $this->eod->update_adjustment($id, $type, (float) $amount, $note, $this->data['CUR_USERNAME'], $this->data['SYSTEM_IP']);
         $this->session->set_flashdata($result['success'] ? 'success' : 'error', $result['message']);
+        redirect(base_url('eod?date=' . rawurlencode($closing_date)), 'refresh');
+    }
+
+    public function refresh_day()
+    {
+        $this->permission_check_with_msg('eod_edit_closed_data');
+
+        $closing_date = $this->input->post('closing_date', true);
+        if (!$this->is_valid_date($closing_date) || $closing_date < $this->eod_start_date() || $closing_date > $this->data['CUR_DATE']) {
+            show_error('Invalid EOD refresh request.', 400);
+        }
+
+        $result = $this->eod->reclose_day($closing_date, $this->data['CUR_USERNAME'], $this->data['SYSTEM_IP']);
+        $message = $result['message'];
+        if ($result['success']) {
+            $message .= ' Collected cash saved as ' . number_format((float) $result['total_cash_collected'], 2, '.', '') . '.';
+        }
+        $this->session->set_flashdata($result['success'] ? 'success' : 'error', $message);
         redirect(base_url('eod?date=' . rawurlencode($closing_date)), 'refresh');
     }
 
