@@ -1,7 +1,8 @@
 <?php
 
 defined('BASEPATH') or exit('No direct script access allowed');
-
+// copy full file of when any mismatch need to show.
+// 
 class Eod_model extends CI_Model
 {
     public function get_summary($closing_date)
