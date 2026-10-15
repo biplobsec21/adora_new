@@ -119,6 +119,37 @@
                   <!-- /.box -->
                </div>
                <div class="col-md-12">
+                  <div class="row">
+                     <div class="col-md-4 col-sm-6">
+                        <div class="info-box">
+                           <span class="info-box-icon bg-blue"><i class="fa fa-cubes"></i></span>
+                           <div class="info-box-content">
+                              <span class="info-box-text">Stock Value (<?= $this->lang->line('unit_price'); ?>)</span>
+                              <span class="info-box-number"><span id="stock-value-unit-price">—</span> <?= $CI->currency(); ?></span>
+                           </div>
+                        </div>
+                     </div>
+                     <div class="col-md-4 col-sm-6">
+                        <div class="info-box">
+                           <span class="info-box-icon bg-green"><i class="fa fa-shopping-cart"></i></span>
+                           <div class="info-box-content">
+                              <span class="info-box-text">Stock Value (<?= $this->lang->line('sales_price'); ?>)</span>
+                              <span class="info-box-number"><span id="stock-value-sales-price">—</span> <?= $CI->currency(); ?></span>
+                           </div>
+                        </div>
+                     </div>
+                     <div class="col-md-4 col-sm-6">
+                        <div class="info-box">
+                           <span class="info-box-icon bg-yellow"><i class="fa fa-line-chart"></i></span>
+                           <div class="info-box-content">
+                              <span class="info-box-text">Approximate Profit</span>
+                              <span class="info-box-number"><span id="stock-approximate-profit">—</span> <?= $CI->currency(); ?></span>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+               <div class="col-md-12">
 
                   <!-- Custom Tabs -->
                   <div class="nav-tabs-custom">
@@ -164,7 +195,8 @@
                                              <th style=""><?= $this->lang->line('tax'); ?></th>
                                              <th style=""><?= $this->lang->line('sales_price'); ?>(<?= $CI->currency(); ?>)</th>
                                              <th style=""><?= $this->lang->line('current_stock'); ?></th>
-                                             <th style=""><?= $this->lang->line('stock_value'); ?></th>
+                                             <th style="">Stock Value (<?= $this->lang->line('unit_price'); ?>)</th>
+                                             <th style="">Stock Value (<?= $this->lang->line('sales_price'); ?>)</th>
                                           </tr>
                                        </thead>
                                        <tbody id="tbodyid">
@@ -311,6 +343,11 @@
                }
                if (key == 'category_wise_stock') {
                   $("#category_wise_stock tbody").empty().append(val);
+               }
+               if (key == 'stock_summary') {
+                  $("#stock-value-unit-price").text(val.stock_value_unit_price);
+                  $("#stock-value-sales-price").text(val.stock_value_sales_price);
+                  $("#stock-approximate-profit").text(val.approximate_profit);
                }
             });
             $(".overlay").remove();

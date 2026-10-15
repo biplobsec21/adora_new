@@ -376,6 +376,7 @@ class Reports_model extends CI_Model
 		if ($q1->num_rows() > 0) {
 			$i = 0;
 			$tot_stock_value = 0;
+			$tot_sales_stock_value = 0;
 			$tot_purchase_price = 0;
 			$tot_sales_price = 0;
 			$tot_stock = 0;
@@ -383,6 +384,7 @@ class Reports_model extends CI_Model
 			foreach ($q1->result() as $res1) {
 				$tax_type = ($res1->tax_type === 'Inclusive') ? 'Inc.' : 'Exc.';
 				$stock_value = $res1->purchase_price * $res1->stock;
+				$sales_stock_value = $res1->sales_price * $res1->stock;
 				$str .= "<tr>";
 				$str .= "<td>" . ++$i . "</td>";
 				$str .= "<td>" . $res1->item_code . "</td>";
@@ -393,11 +395,13 @@ class Reports_model extends CI_Model
 				$str .= "<td>" . $res1->tax_name . "[" . $tax_type . "]</td>";
 				$str .= "<td class='text-right'>" . app_number_format($res1->sales_price) . "</td>";
 				$str .= "<td>" . $res1->stock . "</td>";
-				$str .= "<td class='text-right'>" . $stock_value . "</td>";
+				$str .= "<td class='text-right'>" . app_number_format($stock_value) . "</td>";
+				$str .= "<td class='text-right'>" . app_number_format($sales_stock_value) . "</td>";
 				$str .= "</tr>";
 				$tot_purchase_price += $res1->purchase_price;
 				$tot_sales_price += $res1->sales_price;
 				$tot_stock_value += $stock_value;
+				$tot_sales_stock_value += $sales_stock_value;
 				$tot_stock += $res1->stock;
 			}
 
@@ -408,14 +412,51 @@ class Reports_model extends CI_Model
 				  <td class='text-right text-bold'>" . app_number_format($tot_sales_price) . "</td>
 				  <td class='text-bold'>" . app_number_format($tot_stock) . "</td>
 				  <td class='text-right text-bold'>" . app_number_format($tot_stock_value) . "</td>
+				  <td class='text-right text-bold'>" . app_number_format($tot_sales_stock_value) . "</td>
 			  </tr>";
 		} else {
 			$str .= "<tr>";
-			$str .= "<td class='text-center text-danger' colspan=10>No Records Found</td>";
+			$str .= "<td class='text-center text-danger' colspan=11>No Records Found</td>";
 			$str .= "</tr>";
 		}
 
 		return $str;
+	}
+
+	public function stock_report_summary()
+	{
+		extract($_POST);
+
+		$this->db->select("
+			COALESCE(SUM(a.purchase_price * a.stock), 0) AS stock_value_unit_price,
+			COALESCE(SUM(a.sales_price * a.stock), 0) AS stock_value_sales_price
+		", false);
+		$this->db->from("db_items as a");
+
+		if (!empty($brand_id)) {
+			$this->db->where("a.brand_id", $brand_id);
+		}
+		if (!empty($category_id)) {
+			$this->db->where("a.category_id", $category_id);
+		}
+		if (!empty($item_id)) {
+			$this->db->where("a.id", $item_id);
+		}
+		if (isset($stock_filter) && $stock_filter === 'zero') {
+			$this->db->where("a.stock", 0);
+		} elseif (isset($stock_filter) && $stock_filter === 'non_zero') {
+			$this->db->where("a.stock >", 0);
+		}
+
+		$summary = $this->db->get()->row();
+		$unit_price_value = (float) $summary->stock_value_unit_price;
+		$sales_price_value = (float) $summary->stock_value_sales_price;
+
+		return array(
+			'stock_value_unit_price' => app_number_format($unit_price_value),
+			'stock_value_sales_price' => app_number_format($sales_price_value),
+			'approximate_profit' => app_number_format($sales_price_value - $unit_price_value),
+		);
 	}
 	public function show_item_sales_report()
 	{

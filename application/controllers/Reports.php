@@ -109,6 +109,7 @@ class Reports extends MY_Controller
 	{
 		$data = array(
 			'item_wise_report' => $this->show_stock_report(),
+			'stock_summary' => $this->reports->stock_report_summary(),
 			'brand_wise_stock' => $this->brand_wise_stock(),
 			'category_wise_stock' => $this->category_wise_stock(),
 		);
