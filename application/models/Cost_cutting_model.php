@@ -4,6 +4,8 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Cost_cutting_model extends CI_Model
 {
+    private $customer_name_index;
+
     public function create_batch($period, $file_name, $file_path, $user_data)
     {
         $this->db->insert('db_cost_cutting_batches', array(
@@ -46,12 +48,62 @@ class Cost_cutting_model extends CI_Model
 
         return array(
             'customer_id' => (int) $customer->id,
+            'customer_number' => $customer->customer_number,
             'customer_code' => $customer->customer_code,
             'customer_name' => $customer->customer_name,
             'due_amount' => $due_amount,
             'paid_amount' => $paid_amount,
             'status' => $due_amount <= 0 ? 'Paid' : ($paid_amount > 0 ? 'Partial Paid' : 'Unpaid'),
         );
+    }
+
+    public function get_customer_snapshot_by_name($customer_name)
+    {
+        $normalized_name = $this->normalize_customer_name($customer_name);
+        if ($normalized_name === '') {
+            return null;
+        }
+
+        if ($this->customer_name_index === null) {
+            $this->customer_name_index = array();
+            $customers = $this->db->select('customer_number, customer_name')
+                ->where('status', 1)
+                ->get('db_customers')
+                ->result();
+
+            foreach ($customers as $customer) {
+                $name_key = $this->normalize_customer_name($customer->customer_name);
+                if ($name_key === '') {
+                    continue;
+                }
+                $this->customer_name_index[$name_key][] = $customer->customer_number;
+
+                $name_without_number = preg_replace('/^(?:[a-z]{1,8}-)?\d+\s+/u', '', $name_key);
+                if ($name_without_number !== $name_key && $name_without_number !== '') {
+                    $this->customer_name_index[$name_without_number][] = $customer->customer_number;
+                }
+            }
+        }
+
+        $matches = $this->customer_name_index[$normalized_name] ?? array();
+        $matches = array_values(array_unique($matches));
+        if (count($matches) !== 1) {
+            return null;
+        }
+
+        return $this->get_customer_snapshot($matches[0]);
+    }
+
+    private function normalize_customer_name($customer_name)
+    {
+        $normalized_name = preg_replace('/\s+/u', ' ', trim((string) $customer_name));
+        if ($normalized_name === null) {
+            $normalized_name = preg_replace('/\s+/', ' ', trim((string) $customer_name));
+        }
+
+        return function_exists('mb_strtolower')
+            ? mb_strtolower($normalized_name, 'UTF-8')
+            : strtolower($normalized_name);
     }
 
     public function add_item($batch_id, $item)
@@ -125,9 +177,14 @@ class Cost_cutting_model extends CI_Model
 
             $requested_amount = max(0, (float) $item->cutting_amount);
             $applied_amount = min($requested_amount, (float) $snapshot['due_amount']);
-            if ($applied_amount > 0 && !$this->allocate_cost_cutting_payment($snapshot['customer_id'], $applied_amount, $batch->payment_period, $batch->batch_number, $user_data)) {
+            if ($applied_amount > 0 && !$this->allocate_cost_cutting_payment($snapshot['customer_id'], $applied_amount, $user_data['CUR_DATE'], $batch->batch_number, $user_data)) {
                 $this->db->trans_rollback();
                 return array('success' => false, 'message' => 'Payment could not be recorded for Customer Number ' . $item->customer_code . '.');
+            }
+
+            if (!$this->refresh_customer_sales_due((int) $snapshot['customer_id'])) {
+                $this->db->trans_rollback();
+                return array('success' => false, 'message' => 'Customer sales due could not be recalculated for Customer Number ' . $item->customer_code . '.');
             }
 
             $new_status = $applied_amount >= (float) $snapshot['due_amount'] ? 'Paid' : ($applied_amount > 0 ? 'Partial Paid' : 'Unpaid');
@@ -164,7 +221,26 @@ class Cost_cutting_model extends CI_Model
         $customer = $this->db->select('customer_number')->get_where('db_customers', array('id' => (int) $customer_id))->row();
         if (!$customer) return false;
         $this->lock_customer_by_number($customer->customer_number);
-        return $this->allocate_cost_cutting_payment((int) $customer_id, (float) $amount, $payment_date, $batch_number, $user_data);
+        if (!$this->allocate_cost_cutting_payment((int) $customer_id, (float) $amount, $payment_date, $batch_number, $user_data)) {
+            return false;
+        }
+        return $this->refresh_customer_sales_due((int) $customer_id);
+    }
+
+    private function refresh_customer_sales_due($customer_id)
+    {
+        return $this->db->query(
+            "UPDATE db_customers
+             SET sales_due = (
+                 SELECT COALESCE(SUM(grand_total), 0) - COALESCE(SUM(paid_amount), 0)
+                 FROM db_sales
+                 WHERE customer_id = ?
+                   AND status = 1
+                   AND sales_status = 'Final'
+             )
+             WHERE id = ?",
+            array((int) $customer_id, (int) $customer_id)
+        );
     }
 
     private function lock_customer_by_number($customer_number)

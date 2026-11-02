@@ -81,6 +81,8 @@ class Eod extends MY_Controller
         $type = $this->input->get('type', true);
         $closing_date = $this->input->get('date', true);
         $page = (int) $this->input->get('page', true);
+        $search = $this->input->get('search', true);
+        $search = is_string($search) ? $search : '';
         if (!$this->is_valid_date($closing_date) || $closing_date < $this->eod_start_date()) {
             $closing_date = $this->eod_start_date();
         }
@@ -91,7 +93,7 @@ class Eod extends MY_Controller
             $page = 1;
         }
 
-        $result = $this->eod->get_detail_page($type, $closing_date, $page, 50);
+        $result = $this->eod->get_detail_page($type, $closing_date, $page, 50, $search);
         if ($result === false) {
             return $this->output
                 ->set_status_header(400)

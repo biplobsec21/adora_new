@@ -82,7 +82,7 @@ class Eod_model extends CI_Model
         return $this->db->query($sql, array($from_date, $to_date))->result();
     }
 
-    public function get_detail_page($type, $closing_date, $page, $per_page = 50)
+    public function get_detail_page($type, $closing_date, $page, $per_page = 50, $search = '')
     {
         $page = max(1, (int) $page);
         $per_page = 50;
@@ -99,9 +99,22 @@ class Eod_model extends CI_Model
                 SELECT id, NULL AS sales_id, customer_id, 'Opening balance' AS source,
                        payment_date, payment_type, payment, payment_note, created_by, status
                 FROM db_cobpayments
-            ) AS collected_payments";
+            ) AS collected_payments
+              LEFT JOIN db_customers AS customer ON customer.id = collected_payments.customer_id";
             $where = 'collected_payments.payment_date = ? AND collected_payments.status = 1 AND collected_payments.payment > 0';
             $params = array($closing_date);
+            $search = trim((string) $search);
+            if ($search !== '') {
+                $search_pattern = '%' . $this->db->escape_like_str($search) . '%';
+                $where .= " AND (
+                    COALESCE(customer.customer_name, '') LIKE ? ESCAPE '!'
+                    OR CAST(collected_payments.sales_id AS CHAR) LIKE ? ESCAPE '!'
+                    OR COALESCE(collected_payments.payment_type, '') LIKE ? ESCAPE '!'
+                    OR COALESCE(collected_payments.payment_note, '') LIKE ? ESCAPE '!'
+                    OR COALESCE(collected_payments.created_by, '') LIKE ? ESCAPE '!'
+                )";
+                $params = array_merge($params, array_fill(0, 5, $search_pattern));
+            }
             $count_sql = "SELECT COUNT(*) AS total FROM {$from} WHERE {$where}";
             $total_sql = "SELECT COALESCE(SUM(collected_payments.payment), 0) AS total_amount FROM {$from} WHERE {$where}";
             $data_sql = "SELECT collected_payments.id, collected_payments.source, collected_payments.sales_id,
@@ -112,7 +125,6 @@ class Eod_model extends CI_Model
                                 collected_payments.payment_note AS note,
                                 collected_payments.created_by
                          FROM {$from}
-                         LEFT JOIN db_customers AS customer ON customer.id = collected_payments.customer_id
                          WHERE {$where}
                          ORDER BY collected_payments.id DESC, collected_payments.source ASC
                          LIMIT {$per_page} OFFSET {$offset}";
@@ -168,17 +180,34 @@ class Eod_model extends CI_Model
                          ORDER BY id DESC
                          LIMIT {$per_page} OFFSET {$offset}";
         } elseif ($type === 'expenses') {
-            $from = 'db_expense';
-            $where = 'expense_date = ? AND status = 1';
-            $params = array($closing_date);
+            $from = "(SELECT id, expense_code, expense_date AS transaction_date,
+                            expense_for, reference_no, expense_amt AS amount,
+                            note, created_by
+                     FROM db_expense
+                     WHERE expense_date = ? AND status = 1
+                     UNION ALL
+                     SELECT r.id, CONCAT('REFUND-', r.id) AS expense_code,
+                            DATE(r.paid_at) AS transaction_date,
+                            CONCAT('Customer Refund - ', COALESCE(c.customer_name, 'Unknown customer')) AS expense_for,
+                            COALESCE(NULLIF(r.payment_reference, ''), g.generation_number) AS reference_no,
+                            r.refund_amount AS amount,
+                            CONCAT('Due Generation ', g.generation_number, ' / Cost Cutting ', b.batch_number) AS note,
+                            r.paid_by AS created_by
+                     FROM db_due_generation_refunds AS r
+                     INNER JOIN db_customers AS c ON c.id = r.customer_id
+                     INNER JOIN db_due_generations AS g ON g.id = r.generation_id
+                     INNER JOIN db_cost_cutting_batches AS b ON b.id = r.cost_cutting_batch_id
+                     WHERE r.status = 'Paid' AND DATE(r.paid_at) = ?) AS expense_activity";
+            $where = '1 = 1';
+            $params = array($closing_date, $closing_date);
             $count_sql = "SELECT COUNT(*) AS total FROM {$from} WHERE {$where}";
-            $total_sql = "SELECT COALESCE(SUM(expense_amt), 0) AS total_amount FROM {$from} WHERE {$where}";
-            $data_sql = "SELECT id, expense_code, expense_date AS transaction_date,
-                                expense_for, reference_no, expense_amt AS amount,
+            $total_sql = "SELECT COALESCE(SUM(amount), 0) AS total_amount FROM {$from} WHERE {$where}";
+            $data_sql = "SELECT id, expense_code, transaction_date,
+                                expense_for, reference_no, amount,
                                 note, created_by
                          FROM {$from}
                          WHERE {$where}
-                         ORDER BY id DESC
+                         ORDER BY transaction_date DESC, id DESC
                          LIMIT {$per_page} OFFSET {$offset}";
         } else {
             return false;
@@ -324,11 +353,15 @@ class Eod_model extends CI_Model
                 SELECT transaction_date AS activity_date
                 FROM db_customer_loan_transactions
                 WHERE transaction_date < ?
+                UNION
+                SELECT DATE(paid_at) AS activity_date
+                FROM db_due_generation_refunds
+                WHERE status = 'Paid' AND DATE(paid_at) < ?
              ) AS activity_dates
              LEFT JOIN db_daily_closing AS closing ON closing.closing_date = activity_dates.activity_date
                          WHERE closing.id IS NULL
                              AND activity_dates.activity_date >= ?",
-            array($current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $start_date)
+            array($current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $start_date)
         )->row();
 
         return $query ? $query->pending_date : null;
@@ -596,11 +629,16 @@ class Eod_model extends CI_Model
         $summary['total_loan_repayments_received'] = (float) $loan_repayments->total_loan_repayments_received;
 
         $expenses = $this->db->query(
-            "SELECT COALESCE(SUM(expense_amt), 0) AS total_expenses
-             FROM db_expense
-             WHERE expense_date = ?
-               AND status = 1",
-            array($closing_date)
+            "SELECT
+                (SELECT COALESCE(SUM(expense_amt), 0)
+                 FROM db_expense
+                 WHERE expense_date = ? AND status = 1)
+                +
+                (SELECT COALESCE(SUM(refund_amount), 0)
+                 FROM db_due_generation_refunds
+                 WHERE status = 'Paid' AND DATE(paid_at) = ?)
+                AS total_expenses",
+            array($closing_date, $closing_date)
         )->row();
         $summary['total_expenses'] = (float) $expenses->total_expenses;
 

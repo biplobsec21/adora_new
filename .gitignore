@@ -3,3 +3,9 @@ node_modules/
 vendor/
 application/cache/
 application/logs/
+/uploads/csv/*.csv
+/uploads/csv/customers/
+/uploads/csv/items/
+/uploads/csv/suppliers/
+/uploads/csv/recipes/
+/uploads/csv/due-generation/

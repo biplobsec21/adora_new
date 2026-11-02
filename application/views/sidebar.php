@@ -243,8 +243,8 @@ $CI = &get_instance();
       <?php } ?>
 
       <!--<li class="header">CUSTOMERS</li>-->
-      <?php if ($CI->permissions('customers_add') || $CI->permissions('customers_view') || $CI->permissions('customers_edit') || $CI->permissions('import_customers') || $CI->permissions('customer_loan_view') || $CI->permissions('customer_loan_add') || $CI->permissions('customer_loan_edit') || $CI->permissions('customer_loan_repayment')) { ?>
-        <li class="customers-view-active-li customers-active-li import_customers-active-li customer-number-migration-active-li treeview">
+      <?php if ($CI->permissions('customers_add') || $CI->permissions('customers_view') || $CI->permissions('customers_edit') || $CI->permissions('import_customers') || $CI->permissions('customer_loan_view') || $CI->permissions('customer_loan_add') || $CI->permissions('customer_loan_edit') || $CI->permissions('customer_loan_repayment') || $CI->permissions('customer_refunds_view')) { ?>
+        <li class="customers-view-active-li customers-active-li import_customers-active-li customer-number-migration-active-li customer-refunds-active-li treeview">
           <a href="#">
             <i class="fa fa-group text-aqua"></i> <span><?= $this->lang->line('customers'); ?></span>
             <span class="pull-right-container">
@@ -257,6 +257,9 @@ $CI = &get_instance();
             <?php } ?>
             <?php if ($CI->permissions('customers_view')) { ?>
               <li class="customers-view-active-li"><a href="<?php echo $base_url; ?>customers"><i class="fa fa-list "></i> <span><?= $this->lang->line('customers_list'); ?></span></a></li>
+            <?php } ?>
+            <?php if ($CI->permissions('customer_refunds_view')) { ?>
+              <li class="customer-refunds-active-li"><a href="<?php echo $base_url; ?>customer_refunds"><i class="fa fa-money text-green"></i> <span>Customer Refunds</span></a></li>
             <?php } ?>
             <?php if ($CI->permissions('customer_loan_view') || $CI->permissions('customer_loan_add') || $CI->permissions('customer_loan_repayment')) { ?>
               <li class="customer-loan-management-active-li"><a href="<?php echo $base_url; ?>customer_loan_management"><i class="fa fa-money text-green"></i> <span>Customer Loan Management</span></a></li>

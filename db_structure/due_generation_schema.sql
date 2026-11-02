@@ -78,3 +78,42 @@ CREATE TABLE IF NOT EXISTS `db_due_generation_items` (
     FOREIGN KEY (`generation_id`) REFERENCES `db_due_generations` (`id`)
     ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `db_due_generation_refunds` (
+  `id` int(50) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(50) NOT NULL,
+  `generation_id` int(50) NOT NULL,
+  `generation_item_id` int(50) NOT NULL,
+  `cost_cutting_batch_id` int(50) NOT NULL,
+  `cost_cutting_item_id` int(50) NOT NULL,
+  `refund_amount` decimal(20,2) NOT NULL,
+  `status` enum('Pending','Paid') NOT NULL DEFAULT 'Pending',
+  `generated_by` varchar(50) NOT NULL,
+  `generated_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `paid_by` varchar(50) DEFAULT NULL,
+  `paid_at` datetime DEFAULT NULL,
+  `payment_reference` varchar(100) DEFAULT NULL,
+  `system_ip` varchar(45) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_due_generation_refund_cost_cutting_item` (`cost_cutting_item_id`),
+  KEY `idx_due_generation_refund_customer` (`customer_id`),
+  KEY `idx_due_generation_refund_status` (`status`),
+  KEY `idx_due_generation_refund_generation` (`generation_id`),
+  CONSTRAINT `fk_due_generation_refund_customer`
+    FOREIGN KEY (`customer_id`) REFERENCES `db_customers` (`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_due_generation_refund_generation`
+    FOREIGN KEY (`generation_id`) REFERENCES `db_due_generations` (`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_due_generation_refund_item`
+    FOREIGN KEY (`generation_item_id`) REFERENCES `db_due_generation_items` (`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_due_generation_refund_cost_cutting_batch`
+    FOREIGN KEY (`cost_cutting_batch_id`) REFERENCES `db_cost_cutting_batches` (`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_due_generation_refund_cost_cutting_item`
+    FOREIGN KEY (`cost_cutting_item_id`) REFERENCES `db_cost_cutting_items` (`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

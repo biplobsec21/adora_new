@@ -30,12 +30,12 @@
                             <div class="box-body">
                                 <div class="form-group col-md-4">
                                     <label for="payment_period">Payment Period</label>
-                                    <input type="month" id="payment_period" name="payment_period" class="form-control" value="<?= date('Y-m'); ?>" required>
+                                    <input type="text" id="payment_period" class="form-control" value="<?= date('F Y', strtotime('first day of last month')); ?>" readonly>
                                 </div>
                                 <div class="form-group col-md-8">
                                     <label for="cutting_file">CSV File</label>
                                     <input type="file" id="cutting_file" name="cutting_file" class="form-control" accept=".csv,text/csv" required>
-                                    <p class="help-block">Required columns: Customer Number, Cutting Amount. Customer Name is optional. Customers with N/A numbers must be handled manually from the customer panel.</p>
+                                    <p class="help-block">Required columns: Cutting Amount and either Customer Number or Customer Name. When Customer Name is provided, it is matched to exactly one active customer and takes precedence over Customer Number. Unmatched or ambiguous names are ignored and reported. Customers with N/A numbers must be handled manually from the customer panel.</p>
                                     <a href="<?= $base_url; ?>cost_cutting/download_example" class="btn btn-default"><i class="fa fa-download"></i> Download Example CSV</a>
                                 </div>
                                 <div class="clearfix"></div>

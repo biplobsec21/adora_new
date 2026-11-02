@@ -14,6 +14,7 @@ The End of Day (EOD) Closing module provides a secure, auditable mechanism to fi
 
 * **Dynamic Dashboard:** The interface will calculate and display "Today's Collected Cash", "Today's Expenses", and "Today's Due" dynamically based on the transactions of the selected date.
 * **Transaction Breakdown (Transparency):** Each summarized figure on the dashboard will feature a "View Details" button. Clicking this will open a modal displaying a tabular breakdown of the exact line-item transactions forming that total.
+* **Customer Refund Expenses:** Refunds marked `Paid` are included in the EOD Expenses total and expense detail list on their payment date. Pending refunds are excluded. Refund detail rows include the customer, Due Generation, Cost Cutting batch, amount, payment reference, and operator.
 * **Manual Cash Adjustments (Free-Form):** A dedicated form allowing users to record physical cash additions (Cash In) or deductions (Cash Out) for the selected date.
 * **Day Close Snapshot (Submit):** A final "Close Day" submission action that saves the dynamically calculated totals and manual adjustments into a static, historical record.
 * **Pending EOD Warning (Retroactive Workflow):** If a previous day is not closed, the system dashboard will display a persistent, highly visible warning: *"Pending EOD for [Date]"*. This alert will not block new sales.

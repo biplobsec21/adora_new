@@ -60,10 +60,7 @@ class Cost_cutting extends MY_Controller
     public function upload()
     {
         $this->permission_check_with_msg('payment_management_record');
-        $period = trim((string) $this->input->post('payment_period', true));
-        if (!preg_match('/^\d{4}-\d{2}$/', $period) || !checkdate((int) substr($period, 5, 2), 1, (int) substr($period, 0, 4))) {
-            show_error('Invalid payment period.', 400);
-        }
+        $period = date('Y-m', strtotime('first day of last month'));
         if (empty($_FILES['cutting_file']['name'])) {
             show_error('Please select a CSV file.', 400);
         }
@@ -88,10 +85,10 @@ class Cost_cutting extends MY_Controller
 
         $header = fgetcsv($handle);
         $columns = $this->map_columns($header);
-        if ($columns['customer'] === false || $columns['cutting'] === false) {
+        if (($columns['customer'] === false && $columns['name'] === false) || $columns['cutting'] === false) {
             fclose($handle);
             @unlink($file_path);
-            show_error('CSV must contain Customer Number and Cutting Amount columns.', 400);
+            show_error('CSV must contain Customer Name or Customer Number and a Cutting Amount column.', 400);
         }
 
         $this->db->trans_begin();
@@ -99,6 +96,7 @@ class Cost_cutting extends MY_Controller
         $seen = array();
         $summary = array('total_records' => 0, 'valid_records' => 0, 'error_records' => 0, 'total_due_amount' => 0, 'total_cutting_amount' => 0, 'paid_count' => 0, 'partial_count' => 0, 'unpaid_count' => 0);
         $row_number = 1;
+        $skipped_name_rows = 0;
         while (($row = fgetcsv($handle)) !== false) {
             $row_number++;
             if (count(array_filter($row, 'strlen')) === 0) {
@@ -108,13 +106,22 @@ class Cost_cutting extends MY_Controller
             $customer_number = trim((string) ($row[$columns['customer']] ?? ''));
             $customer_name = $columns['name'] === false ? null : trim((string) ($row[$columns['name']] ?? ''));
             $raw_cutting = trim((string) ($row[$columns['cutting']] ?? ''));
+            $snapshot = $columns['name'] !== false
+                ? $this->cost_cutting->get_customer_snapshot_by_name($customer_name)
+                : $this->cost_cutting->get_customer_snapshot($customer_number);
+            if ($columns['name'] !== false && !$snapshot) {
+                $skipped_name_rows++;
+                continue;
+            }
+            if ($snapshot) {
+                $customer_number = $snapshot['customer_number'];
+            }
             $normalized_number = strtoupper($customer_number);
             $error = '';
             $validation_message = null;
-            $snapshot = null;
             $cutting_amount = null;
 
-            if ($customer_number === '') {
+            if ($columns['name'] === false && $customer_number === '') {
                 $error = 'Customer Number is required.';
             } elseif ($normalized_number === 'N/A') {
                 $error = 'N/A customers must be processed manually from the customer panel.';
@@ -130,7 +137,7 @@ class Cost_cutting extends MY_Controller
             }
             $seen[$normalized_number] = true;
 
-            if ($error === '' && ($snapshot = $this->cost_cutting->get_customer_snapshot($customer_number)) === null) {
+            if ($error === '' && !$snapshot) {
                 $error = 'Customer Number Not Found.';
             }
             if ($error === '' && ($processed_batch = $this->cost_cutting->get_completed_batch_for_customer($period . '-01', $customer_number)) !== null) {
@@ -174,6 +181,12 @@ class Cost_cutting extends MY_Controller
             show_error('Cost Cutting upload could not be saved.', 500);
         }
         $this->db->trans_commit();
+        if ($skipped_name_rows > 0) {
+            $this->session->set_flashdata(
+                'warning',
+                $skipped_name_rows . ' CSV row(s) were ignored because the customer name did not match exactly one active customer.'
+            );
+        }
         redirect(base_url('cost_cutting/review/' . $batch_id));
     }
 

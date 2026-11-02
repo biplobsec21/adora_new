@@ -47,6 +47,7 @@
                                 <th>Records</th>
                                 <th>Total Due</th>
                                 <th>Remaining</th>
+                                <th>Overpaid (Customers / Amount)</th>
                                 <th>Status</th>
                                 <th>SMS</th>
                                 <th>Action</th>
@@ -58,11 +59,44 @@
                                     <td><?= (int) $generation->total_records; ?></td>
                                     <td><?= app_number_format($generation->total_due_amount); ?></td>
                                     <td><?= app_number_format($generation->total_remaining_due); ?></td>
+                                    <td>
+                                        <?php if ($generation->overpaid_count > 0) { ?>
+                                            <?= (int) $generation->overpaid_count; ?> / <?= app_number_format($generation->overpaid_amount); ?>
+                                        <?php } else { ?>
+                                            —
+                                        <?php } ?>
+                                    </td>
                                     <td><?= html_escape($generation->status); ?></td>
                                     <td><?= html_escape(isset($generation->sms_status) ? $generation->sms_status : 'Not Sent'); ?></td>
-                                    <td><a class="btn btn-xs btn-info" href="<?= $base_url; ?>due_generation/details/<?= (int) $generation->id; ?>"><i class="fa fa-eye"></i> Details</a> <a class="btn btn-xs btn-primary" href="<?= $base_url; ?>due_generation/download/<?= (int) $generation->id; ?>"><i class="fa fa-download"></i> CSV</a><?php if ($CI->permissions('send_sms') && $sms_settings->enabled && $sms_settings->due_generation_enabled && ((!isset($generation->sms_status) || !in_array($generation->sms_status, array('Sending', 'Sent'), true)) || ($generation->sms_status === 'Sending' && empty($generation->sms_sent_at)))) { ?> <button type="button" class="btn btn-xs btn-success preview-sms" data-id="<?= (int) $generation->id; ?>"><i class="fa fa-commenting"></i> Send SMS</button><?php } ?></td>
+                                    <td><a class="btn btn-xs btn-info" href="<?= $base_url; ?>due_generation/details/<?= (int) $generation->id; ?>"><i class="fa fa-eye"></i> Details</a> <button type="button" class="btn btn-xs btn-primary dueflow-download" data-id="<?= (int) $generation->id; ?>"><i class="fa fa-download"></i> CSV</button><?php if ($CI->permissions('send_sms') && $sms_settings->enabled && $sms_settings->due_generation_enabled && ((!isset($generation->sms_status) || !in_array($generation->sms_status, array('Sending', 'Sent'), true)) || ($generation->sms_status === 'Sending' && empty($generation->sms_sent_at)))) { ?> <button type="button" class="btn btn-xs btn-success preview-sms" data-id="<?= (int) $generation->id; ?>"><i class="fa fa-commenting"></i> Send SMS</button><?php } ?></td>
                                 </tr><?php } ?></tbody>
                     </table>
+                </div>
+                <div class="modal fade" id="dueflow-download-modal" tabindex="-1" role="dialog">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <form method="get" id="dueflow-download-form">
+                                <div class="modal-header">
+                                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                    <h4 class="modal-title">Download Due Generation CSV</h4>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Choose all customers or export only customers at one company/address.</p>
+                                    <div class="form-group">
+                                        <label for="dueflow-download-address">Company / Address</label>
+                                        <select class="form-control" id="dueflow-download-address" name="address" disabled>
+                                            <option value="">Loading addresses...</option>
+                                        </select>
+                                    </div>
+                                    <div id="dueflow-download-error" class="alert alert-danger" style="display:none"></div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary" id="dueflow-download-submit" disabled><i class="fa fa-download"></i> Download CSV</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal fade" id="sms-preview-modal" tabindex="-1" role="dialog">
                     <div class="modal-dialog modal-lg" role="document">
@@ -103,6 +137,35 @@
             order: [
                 [1, 'desc']
             ]
+        });
+        $('.dueflow-download').on('click', function() {
+            var id = $(this).data('id');
+            var rows = $('#dueflow-download-address');
+            var error = $('#dueflow-download-error');
+            rows.empty().append($('<option>', { value: '', text: 'All customers' })).prop('disabled', true);
+            error.hide().text('');
+            $('#dueflow-download-submit').prop('disabled', true);
+            $('#dueflow-download-form').attr('action', '<?= $base_url; ?>due_generation/download/' + id);
+
+            $.getJSON('<?= $base_url; ?>due_generation/download_options/' + id)
+                .done(function(groups) {
+                    $.each(groups, function(index, group) {
+                        var addressLabel = group.customer_address === '__NO_CUSTOMER_ADDRESS__'
+                            ? 'No address / company'
+                            : group.customer_address;
+                        rows.append($('<option>', {
+                            value: group.customer_address,
+                            text: addressLabel + ' (' + group.customer_count + ')'
+                        }));
+                    });
+                    rows.prop('disabled', false);
+                    $('#dueflow-download-submit').prop('disabled', false);
+                    $('#dueflow-download-modal').modal('show');
+                })
+                .fail(function() {
+                    error.text('Company/address options could not be loaded. Please try again.').show();
+                    $('#dueflow-download-modal').modal('show');
+                });
         });
         $('.preview-sms').on('click', function() {
             var id = $(this).data('id');

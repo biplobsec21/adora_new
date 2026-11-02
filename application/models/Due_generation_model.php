@@ -20,8 +20,17 @@ class Due_generation_model extends CI_Model
     public function calculate_cycle($due_cycle_date, $day)
     {
         $due = $this->make_due_date(substr($due_cycle_date, 0, 7), (int) $day);
-        $previous_month = date('Y-m', strtotime($due . ' -1 month'));
-        $start = $this->make_due_date($previous_month, (int) $day);
+        $previous_generation = $this->db->where('due_cycle_date <', $due)
+            ->order_by('due_cycle_date', 'DESC')
+            ->limit(1)
+            ->get('db_due_generations')
+            ->row();
+        if ($previous_generation) {
+            $start = $previous_generation->due_cycle_date;
+        } else {
+            $previous_month = date('Y-m', strtotime($due . ' -1 month'));
+            $start = $this->make_due_date($previous_month, (int) $day);
+        }
         return array('due_cycle_date' => $due, 'billing_cycle_start' => $start . ' 00:00:00', 'billing_cycle_end' => date('Y-m-d H:i:s', strtotime($due . ' 00:00:00 -1 second')), 'next_cycle_start' => $due . ' 00:00:00');
     }
 
@@ -148,7 +157,42 @@ class Due_generation_model extends CI_Model
 
     public function get_generations()
     {
-        return $this->db->order_by('due_cycle_date', 'DESC')->get('db_due_generations')->result();
+        $generations = $this->db->order_by('due_cycle_date', 'DESC')->get('db_due_generations')->result();
+        if (!$generations) {
+            return $generations;
+        }
+
+        $payment_periods = array();
+        foreach ($generations as $generation) {
+            $payment_periods[] = date('Y-m-01', strtotime($generation->due_cycle_date));
+            $generation->overpaid_count = 0;
+            $generation->overpaid_amount = 0;
+        }
+        $payment_periods = array_values(array_unique($payment_periods));
+        $overpayments = $this->db->select('b.payment_period, COUNT(DISTINCT i.customer_code) AS overpaid_count, SUM(i.cutting_amount - i.new_paid_amount) AS overpaid_amount', false)
+            ->from('db_cost_cutting_items AS i')
+            ->join('db_cost_cutting_batches AS b', 'b.id = i.batch_id')
+            ->where_in('b.payment_period', $payment_periods)
+            ->where('b.status', 'Completed')
+            ->where('i.validation_error IS NOT NULL', null, false)
+            ->where('i.validation_error !=', '')
+            ->where('i.cutting_amount > i.new_paid_amount', null, false)
+            ->group_by('b.payment_period')
+            ->get()
+            ->result();
+        $overpayments_by_period = array();
+        foreach ($overpayments as $overpayment) {
+            $overpayments_by_period[date('Y-m', strtotime($overpayment->payment_period))] = $overpayment;
+        }
+        foreach ($generations as $generation) {
+            $payment_month = date('Y-m', strtotime($generation->due_cycle_date));
+            if (isset($overpayments_by_period[$payment_month])) {
+                $generation->overpaid_count = (int) $overpayments_by_period[$payment_month]->overpaid_count;
+                $generation->overpaid_amount = (float) $overpayments_by_period[$payment_month]->overpaid_amount;
+            }
+        }
+
+        return $generations;
     }
     public function get_generation($id)
     {
@@ -156,12 +200,84 @@ class Due_generation_model extends CI_Model
     }
     public function get_items($id)
     {
-        return $this->db->select('i.*, COALESCE(c.customer_number, i.customer_number) AS customer_number, COALESCE(c.customer_name, i.customer_name) AS customer_name, COALESCE(c.mobile, i.mobile) AS mobile, c.address AS customer_address')
+        $items = $this->db->select('i.*, COALESCE(c.customer_number, i.customer_number) AS customer_number, COALESCE(c.customer_name, i.customer_name) AS customer_name, COALESCE(c.mobile, i.mobile) AS mobile, c.address AS customer_address')
             ->from('db_due_generation_items AS i')
             ->join('db_customers AS c', 'c.id = i.customer_id', 'left')
             ->where('i.generation_id', (int) $id)
             ->order_by('customer_name', 'ASC')
             ->get()->result();
+
+        $generation = $this->get_generation($id);
+        if (!$generation || !$items) {
+            return $items;
+        }
+
+        $payment_period = date('Y-m-01', strtotime($generation->due_cycle_date));
+        $overpaid_items = $this->db->select('i.customer_id, i.id AS cost_cutting_item_id, i.batch_id AS cost_cutting_batch_id, b.batch_number, i.cutting_amount, i.new_paid_amount, r.id AS refund_id, r.status AS refund_status, r.refund_amount')
+            ->from('db_cost_cutting_items AS i')
+            ->join('db_cost_cutting_batches AS b', 'b.id = i.batch_id')
+            ->join('db_due_generation_refunds AS r', 'r.cost_cutting_item_id = i.id', 'left')
+            ->where('b.payment_period', $payment_period)
+            ->where('b.status', 'Completed')
+            ->where('i.cutting_amount > i.new_paid_amount', null, false)
+            ->order_by('b.id', 'ASC')
+            ->get()
+            ->result();
+        $overpaid_by_customer = array();
+        foreach ($overpaid_items as $overpaid_item) {
+            $requested = max(0, (float) $overpaid_item->cutting_amount);
+            $applied = max(0, (float) $overpaid_item->new_paid_amount);
+            if ($requested <= $applied) {
+                continue;
+            }
+            $overpaid_by_customer[(int) $overpaid_item->customer_id] = array(
+                'batch_number' => $overpaid_item->batch_number,
+                'requested_amount' => $requested,
+                'applied_amount' => $applied,
+                'overpaid_amount' => round($requested - $applied, 2),
+                'cost_cutting_item_id' => (int) $overpaid_item->cost_cutting_item_id,
+                'cost_cutting_batch_id' => (int) $overpaid_item->cost_cutting_batch_id,
+                'refund_id' => $overpaid_item->refund_id ? (int) $overpaid_item->refund_id : null,
+                'refund_status' => $overpaid_item->refund_status,
+                'refund_amount' => $overpaid_item->refund_amount !== null ? (float) $overpaid_item->refund_amount : null,
+            );
+        }
+        foreach ($items as $item) {
+            $item->completed_cost_cutting_overpayment = $overpaid_by_customer[(int) $item->customer_id] ?? null;
+        }
+
+        return $items;
+    }
+
+    public function get_download_groups($id)
+    {
+        $groups = $this->db->select('MIN(BINARY c.address) AS customer_address, COUNT(*) AS customer_count', false)
+            ->from('db_due_generation_items AS i')
+            ->join('db_customers AS c', 'c.id = i.customer_id', 'left')
+            ->where('i.generation_id', (int) $id)
+            ->where('c.address IS NOT NULL', null, false)
+            ->where('TRIM(c.address) <>', '')
+            ->group_by('BINARY LOWER(TRIM(c.address))', false)
+            ->order_by('LOWER(TRIM(c.address))', 'ASC', false)
+            ->get()
+            ->result();
+
+        $no_address_count = $this->db->from('db_due_generation_items AS i')
+            ->join('db_customers AS c', 'c.id = i.customer_id', 'left')
+            ->where('i.generation_id', (int) $id)
+            ->group_start()
+            ->where('c.address IS NULL', null, false)
+            ->or_where('TRIM(c.address) =', '')
+            ->group_end()
+            ->count_all_results();
+        if ($no_address_count > 0) {
+            $groups[] = (object) array(
+                'customer_address' => '__NO_CUSTOMER_ADDRESS__',
+                'customer_count' => $no_address_count,
+            );
+        }
+
+        return $groups;
     }
     public function mark_sent($id)
     {
@@ -172,34 +288,75 @@ class Due_generation_model extends CI_Model
     {
         $batch = $this->db->get_where('db_cost_cutting_batches', array('id' => (int) $batch_id))->row();
         if (!$batch) return array('success' => false, 'found' => false, 'message' => 'Cost Cutting batch was not found.');
+        if ($batch->status !== 'Completed') return array('success' => false, 'found' => false, 'message' => 'Only completed Cost Cutting batches can be synchronized with DueFlow.');
 
-        $settings = $this->get_settings();
-        $cycle = $this->calculate_cycle($batch->payment_period, $settings->cost_cutting_day);
-        $generation = $this->db->get_where('db_due_generations', array('due_cycle_date' => $cycle['due_cycle_date']))->row();
+        $period_start = date('Y-m-01', strtotime($batch->payment_period));
+        $period_end = date('Y-m-01', strtotime($period_start . ' +1 month'));
+        $generation = $this->db->where('generation_type', 'Monthly Cycle')
+            ->where('due_cycle_date >=', $period_start)
+            ->where('due_cycle_date <', $period_end)
+            ->order_by('due_cycle_date', 'DESC')
+            ->limit(1)
+            ->get('db_due_generations')
+            ->row();
         if (!$generation) {
             $opening = $this->get_opening_generation();
-            if ($opening && $opening->status !== 'Reconciled' && date('Y-m', strtotime($opening->due_cycle_date)) === date('Y-m', strtotime($batch->payment_period))) $generation = $opening;
+            if ($opening && date('Y-m', strtotime($opening->due_cycle_date)) === date('Y-m', strtotime($batch->payment_period))) $generation = $opening;
         }
         if (!$generation) return array('success' => true, 'found' => false, 'message' => 'No DueFlow generation exists for this Cost Cutting period.');
-        if ($generation->status === 'Reconciled') return array('success' => true, 'found' => true, 'message' => 'DueFlow was already reconciled.');
 
+        $generation_already_reconciled = $generation->status === 'Reconciled';
         $cut_items = array();
-        foreach ($this->db->get_where('db_cost_cutting_items', array('batch_id' => (int) $batch_id))->result() as $item) {
-            $cut_items[strtoupper(trim($item->customer_code))] = max(0, (float) $item->new_paid_amount);
+        $completed_batch_items = $this->db
+            ->from('db_cost_cutting_items AS i')
+            ->join('db_cost_cutting_batches AS b', 'b.id = i.batch_id')
+            ->where('i.batch_id', (int) $batch_id)
+            ->where('b.status', 'Completed')
+            ->get()
+            ->result();
+        foreach ($completed_batch_items as $item) {
+            $cut_items[strtoupper(trim($item->customer_code))] = $item;
         }
         $items = $this->get_items($generation->id);
         $summary = array('total_cut_amount' => 0, 'total_remaining_due' => 0);
         foreach ($items as $item) {
             $number = strtoupper(trim($item->customer_number));
             $matched = array_key_exists($number, $cut_items);
-            $cut = $matched ? min((float) $item->total_due_amount, $cut_items[$number]) : 0;
-            $remaining = max(0, round((float) $item->total_due_amount - $cut, 2));
+            $cost_cutting_item = $matched ? $cut_items[$number] : null;
+            $cut = $matched ? min((float) $item->total_due_amount, max(0, (float) $cost_cutting_item->new_paid_amount)) : 0;
+            $remaining = $this->get_reconciled_remaining_due($item, $cut, $user_data['CUR_DATE']);
             $status = $remaining > 0 ? ($cut > 0 ? 'Carried Forward' : 'Unpaid') : 'Fully Cut';
-            $this->db->where('id', (int) $item->id)->update('db_due_generation_items', array('actually_cut_amount' => $cut, 'remaining_due_amount' => $remaining, 'status' => $status));
+            if (!$generation_already_reconciled) {
+                $this->db->where('id', (int) $item->id)->update('db_due_generation_items', array('actually_cut_amount' => $cut, 'remaining_due_amount' => $remaining, 'status' => $status));
+            }
+            if ($cost_cutting_item && (float) $cost_cutting_item->cutting_amount > (float) $cost_cutting_item->new_paid_amount) {
+                $existing_refund = $this->db->get_where('db_due_generation_refunds', array(
+                    'cost_cutting_item_id' => (int) $cost_cutting_item->id,
+                ))->row();
+                if (!$existing_refund) {
+                    $refund_amount = round((float) $cost_cutting_item->cutting_amount - (float) $cost_cutting_item->new_paid_amount, 2);
+                    if (!$this->db->insert('db_due_generation_refunds', array(
+                        'customer_id' => (int) $item->customer_id,
+                        'generation_id' => (int) $generation->id,
+                        'generation_item_id' => (int) $item->id,
+                        'cost_cutting_batch_id' => (int) $batch_id,
+                        'cost_cutting_item_id' => (int) $cost_cutting_item->id,
+                        'refund_amount' => $refund_amount,
+                        'status' => 'Pending',
+                        'generated_by' => $user_data['CUR_USERNAME'],
+                        'generated_at' => date('Y-m-d H:i:s'),
+                        'system_ip' => $user_data['SYSTEM_IP'],
+                    ))) {
+                        return array('success' => false, 'found' => true, 'message' => 'The pending refund record could not be created for Customer Number ' . $item->customer_number . '.');
+                    }
+                }
+            }
             $summary['total_cut_amount'] += $cut;
             $summary['total_remaining_due'] += $remaining;
         }
-        $this->db->where('id', (int) $generation->id)->update('db_due_generations', array_merge($summary, array('status' => 'Reconciled', 'reconciled_by' => $user_data['CUR_USERNAME'], 'reconciled_at' => date('Y-m-d H:i:s'))));
+        if (!$generation_already_reconciled) {
+            $this->db->where('id', (int) $generation->id)->update('db_due_generations', array_merge($summary, array('status' => 'Reconciled', 'reconciled_by' => $user_data['CUR_USERNAME'], 'reconciled_at' => date('Y-m-d H:i:s'))));
+        }
         return array('success' => $this->db->trans_status(), 'found' => true, 'message' => 'DueFlow was synchronized with Cost Cutting.');
     }
 
@@ -234,7 +391,7 @@ class Due_generation_model extends CI_Model
                 $this->db->trans_rollback();
                 return array('success' => false, 'message' => 'Payment could not be recorded for Customer Number ' . $item->customer_number . '.');
             }
-            $remaining = max(0, round((float) $item->total_due_amount - $cut, 2));
+            $remaining = $this->get_reconciled_remaining_due($item, $cut, $user_data['CUR_DATE']);
             $status = $remaining > 0 ? ($matched ? 'Carried Forward' : 'Unpaid') : 'Fully Cut';
             $this->db->where('id', $item->id)->update('db_due_generation_items', array('actually_cut_amount' => $cut, 'remaining_due_amount' => $remaining, 'status' => $status));
             $summary['total_cut_amount'] += $cut;
@@ -267,6 +424,14 @@ class Due_generation_model extends CI_Model
         $sales = $this->db->select('COALESCE(SUM(GREATEST(grand_total - paid_amount, 0)), 0) AS due', false)->where(array('customer_id' => (int) $customer_id, 'status' => 1, 'sales_status' => 'Final'))->get('db_sales')->row();
         $loan_due = $this->get_loan_due_movement($customer_id, '0000-01-01', date('Y-m-d', strtotime($as_of_date . ' +1 day')));
         return max(0, round((float) $customer->opening_balance - $opening_paid + (float) $sales->due + $loan_due, 2));
+    }
+
+    private function get_reconciled_remaining_due($item, $cut, $as_of_date)
+    {
+        $generation_remaining = max(0, round((float) $item->total_due_amount - (float) $cut, 2));
+        $current_customer_due = $this->get_customer_current_due((int) $item->customer_id, $as_of_date);
+
+        return min($generation_remaining, $current_customer_due);
     }
 
     private function get_loan_due_movement($customer_id, $start, $end)

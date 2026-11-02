@@ -883,6 +883,8 @@ class Sales_model extends CI_Model
 			$this->audit_log->snapshot('sales_payment', $payment_id, 'db_salespayments');
 		}
 
+		$summary_deleted = $customer_id === null
+			|| $this->db->where('salespayment_id', $payment_id)->delete('db_customer_payments');
 		$q1 = $this->db->where('id', $payment_id)->delete('db_salespayments');
 		$q2 = $q1
 			? $this->update_sales_payment_status((int) $payment->sales_id, (int) $payment->customer_id)
@@ -898,13 +900,112 @@ class Sales_model extends CI_Model
 			);
 		}
 
-		if (!$q1 || !$q2 || !$audit_logged || !$this->db->trans_status()) {
+		if (!$summary_deleted || !$q1 || !$q2 || !$audit_logged || !$this->db->trans_status()) {
 			$this->db->trans_rollback();
 			return "failed";
 		} else {
 			$this->db->trans_commit();
 			return "success";
 		}
+	}
+
+	public function delete_payment_group($summary_id, $customer_id)
+	{
+		$summary_id = (int) $summary_id;
+		$customer_id = (int) $customer_id;
+		if ($summary_id < 1 || $customer_id < 1) {
+			return 'failed';
+		}
+
+		$this->db->trans_begin();
+		$summary = $this->db
+			->select('id, payment_date, payment_type, created_date, created_time')
+			->from('db_customer_payments')
+			->where('id', $summary_id)
+			->where('customer_id', $customer_id)
+			->where('status', 1)
+			->get()
+			->row();
+		if (!$summary) {
+			$this->db->trans_rollback();
+			return 'failed';
+		}
+
+		$group_values = array(
+			$customer_id,
+			$summary->payment_date,
+			$summary->payment_type,
+			$summary->created_date,
+			$summary->created_time,
+		);
+		$summaries = $this->db->query(
+			'SELECT id
+			 FROM db_customer_payments
+			 WHERE customer_id = ?
+			   AND status = 1
+			   AND payment_date <=> ?
+			   AND BINARY payment_type <=> BINARY ?
+			   AND created_date <=> ?
+			   AND created_time <=> ?',
+			$group_values
+		)->result();
+		$allocations = $this->db->query(
+			'SELECT payment.id, payment.sales_id, sale.sales_code
+			 FROM db_salespayments AS payment
+			 JOIN db_sales AS sale ON sale.id = payment.sales_id
+			 WHERE sale.customer_id = ?
+			   AND payment.payment_date <=> ?
+			   AND BINARY payment.payment_type <=> BINARY ?
+			   AND payment.created_date <=> ?
+			   AND payment.created_time <=> ?',
+			$group_values
+		)->result();
+		if (!$summaries || !$allocations) {
+			$this->db->trans_rollback();
+			return 'failed';
+		}
+
+		$payment_ids = array();
+		$sales = array();
+		foreach ($allocations as $allocation) {
+			$payment_ids[] = (int) $allocation->id;
+			$sales[(int) $allocation->sales_id] = (int) $allocation->sales_id;
+			$this->audit_log->snapshot('sales_payment', (int) $allocation->id, 'db_salespayments');
+		}
+		$summary_ids = array_map(function ($row) {
+			return (int) $row->id;
+		}, $summaries);
+		$summary_deleted = $this->db->where_in('id', $summary_ids)->where('customer_id', $customer_id)->delete('db_customer_payments');
+		$payments_deleted = $summary_deleted
+			&& $this->db->where_in('id', $payment_ids)->delete('db_salespayments')
+			&& $this->db->affected_rows() === count($payment_ids);
+
+		$status_updated = $payments_deleted;
+		$audit_logged = $payments_deleted;
+		if ($payments_deleted) {
+			foreach ($sales as $sales_id) {
+				if (!$this->update_sales_payment_status($sales_id, $customer_id)) {
+					$status_updated = false;
+					break;
+				}
+			}
+			foreach ($allocations as $allocation) {
+				if (!$status_updated) {
+					break;
+				}
+				if (!$this->audit_log->log('sales_payment', 'delete', (int) $allocation->id, $allocation->sales_code, null)) {
+					$audit_logged = false;
+					break;
+				}
+			}
+		}
+
+		if (!$summary_deleted || !$payments_deleted || !$status_updated || !$audit_logged || !$this->db->trans_status()) {
+			$this->db->trans_rollback();
+			return 'failed';
+		}
+		$this->db->trans_commit();
+		return 'success';
 	}
 
 	public function show_pay_now_modal($sales_id)

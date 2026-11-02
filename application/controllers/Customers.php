@@ -282,6 +282,14 @@ class Customers extends MY_Controller
 		$this->load->model('sales_model', 'sales');
 		echo $this->sales->delete_payment($payment_id, $customer_id);
 	}
+	public function delete_customer_sales_payment_group()
+	{
+		$this->permission_check_with_msg('sales_payment_delete');
+		$summary_id = (int) $this->input->post('summary_id');
+		$customer_id = (int) $this->input->post('customer_id');
+		$this->load->model('sales_model', 'sales');
+		echo $this->sales->delete_payment_group($summary_id, $customer_id);
+	}
 	public function getCustomers($id = '')
 	{
 		echo $this->customers->getCustomersJson($id);

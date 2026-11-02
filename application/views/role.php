@@ -586,6 +586,12 @@ echo "<pre>";
                                   <input type="checkbox" class="customers_all" id='customers_view' name="permission[customers_view]"> <?= $this->lang->line('view'); ?>
                                 </label></div>
                               <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="customers_all" id='customer_refunds_view' name="permission[customer_refunds_view]"> View customer refunds
+                                </label></div>
+                              <div class="checkbox icheck"><label>
+                                  <input type="checkbox" class="customers_all" id='customer_refunds_pay' name="permission[customer_refunds_pay]"> Confirm refund payment
+                                </label></div>
+                              <div class="checkbox icheck"><label>
                                   <input type="checkbox" class="customers_all" id='customer_loan_view' name="permission[customer_loan_view]"> Customer Loan View
                                 </label></div>
                               <div class="checkbox icheck"><label>

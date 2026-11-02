@@ -352,6 +352,10 @@
                     <div class="modal-body">
                         <div id="eod-details-loading" class="text-center" style="display:none;">Loading...</div>
                         <div id="eod-details-error" class="alert alert-danger" style="display:none;"></div>
+                        <div id="eod-details-search-wrap" class="form-group" style="display:none;">
+                            <label class="sr-only" for="eod-details-search">Search collected cash</label>
+                            <input type="search" id="eod-details-search" class="form-control" placeholder="Search customer, sales ID, payment type, note, or user">
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-bordered table-striped" id="eod-details-table">
                                 <thead></thead>
@@ -381,8 +385,10 @@
                 date: '',
                 label: '',
                 page: 1,
-                totalPages: 0
+                totalPages: 0,
+                search: ''
             };
+            var searchTimer;
 
             function escapeHtml(value) {
                 return $('<div>').text(value === null || typeof value === 'undefined' ? '' : value).html();
@@ -461,16 +467,20 @@
                     return '<th>' + escapeHtml(column[1]) + '</th>';
                 }).join('') + '</tr>';
                 $head.html(header);
-                $.each(response.data, function(_, row) {
-                    var cells = $.map(columns, function(column) {
-                        var value = row[column[0]];
-                        if (['amount', 'grand_total', 'paid_amount'].indexOf(column[0]) !== -1) {
-                            value = formatAmount(value);
-                        }
-                        return '<td>' + escapeHtml(value) + '</td>';
-                    }).join('');
-                    $body.append('<tr>' + cells + '</tr>');
-                });
+                if (response.data.length === 0) {
+                    $body.append('<tr><td colspan="' + columns.length + '" class="text-center">No matching records found.</td></tr>');
+                } else {
+                    $.each(response.data, function(_, row) {
+                        var cells = $.map(columns, function(column) {
+                            var value = row[column[0]];
+                            if (['amount', 'grand_total', 'paid_amount'].indexOf(column[0]) !== -1) {
+                                value = formatAmount(value);
+                            }
+                            return '<td>' + escapeHtml(value) + '</td>';
+                        }).join('');
+                        $body.append('<tr>' + cells + '</tr>');
+                    });
+                }
                 $('#eod-details-page-status').text(response.total + ' record(s), page ' + response.page + ' of ' + (response.total_pages || 1));
                 $('#eod-details-prev').prop('disabled', response.page <= 1);
                 $('#eod-details-next').prop('disabled', response.page >= response.total_pages || response.total_pages === 0);
@@ -483,7 +493,8 @@
                 $.getJSON('<?= $base_url; ?>eod/details', {
                     type: detailState.type,
                     date: detailState.date,
-                    page: detailState.page
+                    page: detailState.page,
+                    search: detailState.search
                 }).done(renderDetails).fail(function(xhr) {
                     var message = 'Unable to load transaction details.';
                     if (xhr.responseJSON && xhr.responseJSON.error) {
@@ -500,9 +511,20 @@
                 detailState.date = $(this).data('detail-date');
                 detailState.label = $(this).data('detail-label');
                 detailState.page = 1;
+                detailState.search = '';
+                $('#eod-details-search').val('');
+                $('#eod-details-search-wrap').toggle(detailState.type === 'collected_cash');
                 $('#eod-details-title').text(detailState.label + ' Details - ' + detailState.date);
                 $('#eod-details-modal').modal('show');
                 loadDetails();
+            });
+            $('#eod-details-search').on('input', function() {
+                clearTimeout(searchTimer);
+                detailState.search = $(this).val().trim();
+                searchTimer = setTimeout(function() {
+                    detailState.page = 1;
+                    loadDetails();
+                }, 300);
             });
             $('#eod-details-prev').on('click', function() {
                 if (detailState.page > 1) {

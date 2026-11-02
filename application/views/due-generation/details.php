@@ -38,6 +38,7 @@
                                     <th>Total Due</th>
                                     <th>Cut</th>
                                     <th>Remaining</th>
+                                    <th>Cost Cutting Overpayment / Refund</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -50,6 +51,20 @@
                                         <td><?= app_number_format($item->total_due_amount); ?></td>
                                         <td><?= app_number_format($item->actually_cut_amount); ?></td>
                                         <td><?= app_number_format($item->remaining_due_amount); ?></td>
+                                        <td>
+                                            <?php if (!empty($item->completed_cost_cutting_overpayment)) { ?>
+                                                <span class="label label-warning">Overpaid <?= app_number_format($item->completed_cost_cutting_overpayment['overpaid_amount']); ?></span>
+                                                <br>
+                                                <small><?= html_escape($item->completed_cost_cutting_overpayment['batch_number']); ?> · Requested <?= app_number_format($item->completed_cost_cutting_overpayment['requested_amount']); ?> · Applied <?= app_number_format($item->completed_cost_cutting_overpayment['applied_amount']); ?></small>
+                                                <?php if (!empty($item->completed_cost_cutting_overpayment['refund_id'])) { ?>
+                                                    <br><span class="label label-info">Refund <?= html_escape($item->completed_cost_cutting_overpayment['refund_status']); ?> · <?= app_number_format($item->completed_cost_cutting_overpayment['refund_amount']); ?></span>
+                                                <?php } else { ?>
+                                                    <br><span class="label label-default">Refund not registered</span>
+                                                <?php } ?>
+                                            <?php } else { ?>
+                                                —
+                                            <?php } ?>
+                                        </td>
                                         <td><?= html_escape($item->status); ?></td>
                                     </tr><?php } ?></tbody>
                         </table>
@@ -59,7 +74,11 @@
         </div><?php include APPPATH . 'views/footer.php'; ?></div>
     <?php include APPPATH . 'views/comman/code_js_datatable.php'; ?><script>
         $('#dueflow-items').DataTable({
-            pageLength: 50
+            pageLength: 50,
+            lengthMenu: [
+                [10, 25, 50, 100, -1],
+                [10, 25, 50, 100, "All"]
+            ]
         });
     </script>
 </body>

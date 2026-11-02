@@ -65,26 +65,57 @@
                         <h3 class="box-title">Uploaded File: <?= html_escape($batch->file_name); ?></h3>
                     </div>
                     <div class="box-body table-responsive">
+                        <?php
+                        $total_due_at_upload = 0;
+                        $total_cutting_amount = 0;
+                        $total_due_after_cutting = 0;
+                        foreach ($items as $item) {
+                            $total_due_at_upload += (float) $item->due_amount;
+                            if ($item->cutting_amount !== null) {
+                                $requested_amount = max(0, (float) $item->cutting_amount);
+                                $applied_amount = min($requested_amount, (float) $item->due_amount);
+                                $total_cutting_amount += (float) $item->cutting_amount;
+                                $total_due_after_cutting += (float) $item->due_amount - $applied_amount;
+                            }
+                        }
+                        ?>
                         <table class="table table-bordered table-striped">
                             <thead class="bg-primary">
                                 <tr>
                                     <th>Row</th>
                                     <th>Customer Number</th>
                                     <th>Customer</th>
-                                    <th>Total Due</th>
+                                    <th>Due (At upload)</th>
                                     <th>Cutting Amount</th>
+                                    <th>Due After Cutting</th>
                                     <th>Result</th>
                                     <th>Validation</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($items as $item) { ?>
+                                    <?php
+                                    $due_after_cutting = null;
+                                    if ($item->cutting_amount !== null) {
+                                        $requested_amount = max(0, (float) $item->cutting_amount);
+                                        $applied_amount = min($requested_amount, (float) $item->due_amount);
+                                        $due_after_cutting = (float) $item->due_amount - $applied_amount;
+                                    }
+                                    ?>
                                     <tr class="<?= $item->validation_status === 'Invalid' ? 'danger' : ((float) $item->cutting_amount > (float) $item->due_amount ? 'warning' : ''); ?>">
                                         <td><?= (int) $item->source_row_number; ?></td>
                                         <td><?= html_escape($item->customer_code); ?></td>
-                                        <td><?= html_escape($item->customer_name); ?></td>
+                                        <td>
+                                            <?= html_escape($item->customer_name); ?>
+                                            <?php if (!empty($item->customer_id)) { ?>
+                                                <a href="<?= base_url('customers/customer_ledger/' . (int) $item->customer_id); ?>" class="btn btn-xs btn-default" target="_blank" rel="noopener" title="Open customer ledger" aria-label="Open ledger for <?= html_escape($item->customer_name); ?>">
+                                                    <i class="fa fa-book"></i> Ledger
+                                                </a>
+                                            <?php } ?>
+                                        </td>
                                         <td><?= app_number_format($item->due_amount); ?></td>
                                         <td><?= $item->cutting_amount === null ? '-' : app_number_format($item->cutting_amount); ?></td>
+                                        <td><?= $due_after_cutting === null ? '-' : app_number_format($due_after_cutting); ?></td>
                                         <td><?= html_escape($item->new_status ?: '-'); ?></td>
                                         <td>
                                             <?php if ((float) $item->cutting_amount > (float) $item->due_amount) { ?>
@@ -96,6 +127,16 @@
                                     </tr>
                                 <?php } ?>
                             </tbody>
+                            <tfoot>
+                                <tr class="bg-gray">
+                                    <th colspan="3">Total</th>
+                                    <th><?= app_number_format($total_due_at_upload); ?></th>
+                                    <th><?= app_number_format($total_cutting_amount); ?></th>
+                                    <th><?= app_number_format($total_due_after_cutting); ?></th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                     <div class="box-footer">

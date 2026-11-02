@@ -69,18 +69,63 @@ class Due_generation extends MY_Controller
         $this->permission_check('payment_management_view');
         $generation = $this->due_generation->get_generation($id);
         if (!$generation) show_404();
-        $this->due_generation->mark_sent($generation->id);
+        $selected_address = (string) $this->input->get('address');
+        $download_items = $this->due_generation->get_items($generation->id);
+        if ($selected_address !== '') {
+            $download_groups = $this->due_generation->get_download_groups($generation->id);
+            $selected_group = null;
+            foreach ($download_groups as $group) {
+                if ($selected_address === '__NO_CUSTOMER_ADDRESS__'
+                    ? $group->customer_address === '__NO_CUSTOMER_ADDRESS__'
+                    : strtolower(trim($selected_address)) === strtolower(trim((string) $group->customer_address))) {
+                    $selected_group = $group;
+                    break;
+                }
+            }
+            if (!$selected_group) {
+                show_error('The selected company/address is not part of this generation.', 400);
+            }
+            if ($selected_address === '__NO_CUSTOMER_ADDRESS__') {
+                $download_items = array_values(array_filter($download_items, function ($item) {
+                    return trim((string) $item->customer_address) === '';
+                }));
+            } else {
+                $normalized_address = strtolower(trim((string) $selected_group->customer_address));
+                $download_items = array_values(array_filter($download_items, function ($item) use ($normalized_address) {
+                    return strtolower(trim((string) $item->customer_address)) === $normalized_address;
+                }));
+            }
+        } else {
+            $this->due_generation->mark_sent($generation->id);
+        }
         header('Content-Type: text/csv; charset=UTF-8');
-        header('Content-Disposition: attachment; filename="' . basename($generation->file_name) . '"');
+        $filename = pathinfo(basename($generation->file_name), PATHINFO_FILENAME);
+        if ($selected_address !== '') {
+            $address_suffix = $selected_address === '__NO_CUSTOMER_ADDRESS__'
+                ? 'no-address'
+                : trim((string) preg_replace('/[^A-Za-z0-9_-]+/', '-', $selected_group->customer_address), '-_');
+            $filename .= '-' . ($address_suffix !== '' ? $address_suffix : 'company');
+        }
+        header('Content-Disposition: attachment; filename="' . $filename . '.csv"');
         header('Pragma: no-cache');
         header('Expires: 0');
         $output = fopen('php://output', 'w');
         fputcsv($output, array('Customer Number', 'Customer Name', 'Customer Address', 'Previous Outstanding', 'New Due', 'Cutting Amount'));
-        foreach ($this->due_generation->get_items($generation->id) as $item) {
+        foreach ($download_items as $item) {
             fputcsv($output, array($item->customer_number, $item->customer_name, $item->customer_address ?? '', $item->previous_outstanding_amount, $item->new_due_amount, $item->total_due_amount));
         }
         fclose($output);
         exit;
+    }
+
+    public function download_options($id)
+    {
+        $this->permission_check('payment_management_view');
+        $generation = $this->due_generation->get_generation($id);
+        if (!$generation) show_404();
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode($this->due_generation->get_download_groups($generation->id)));
     }
 
     public function reconcile($id)

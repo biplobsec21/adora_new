@@ -496,35 +496,57 @@ function save_return_due_payment(customer_id){
     }
   }
 
+function toggle_customer_payment_details(summary_id, button) {
+  var rows = $(".customer-payment-detail-" + summary_id);
+  var showing = rows.first().is(":visible");
+  rows.toggle(!showing);
+  $(button).text((showing ? "Show applied (" : "Hide applied (") + rows.length + ")");
+}
+
 function delete_customer_sales_payment(payment_id, customer_id) {
-  if (confirm("Delete this customer payment? The invoice balance will be recalculated.")) {
-    var base_url = $("#base_url").val().trim();
-    $(".box").append('<div class="overlay"><i class="fa fa-refresh fa-spin"></i></div>');
-    $.post(base_url + "customers/delete_customer_sales_payment", {
-      payment_id: payment_id,
-      customer_id: customer_id
-    }, function (result) {
-      if (typeof result !== "string") {
-        toastr["error"]("Unexpected server response. The payment was not confirmed as deleted.");
-        return;
-      }
-      result = result.trim();
-      if (result === "") {
-        toastr["error"]("The server returned an empty response. The payment was not confirmed as deleted.");
-        return;
-      }
-      if (result === "success") {
-        toastr["success"]("Payment deleted successfully.");
-        location.reload(true);
-      } else if (result === "failed") {
-        toastr["error"]("Failed to delete payment. Please try again.");
-      } else {
-        toastr["error"](result);
-      }
-    }).fail(function () {
-      toastr["error"]("Unable to delete payment. Please try again.");
-    }).always(function () {
-      $(".overlay").remove();
-    });
+  if (!confirm("Delete this customer payment? The invoice balance will be recalculated.")) {
+    return;
   }
+  var base_url = $("#base_url").val().trim();
+  $(".box").append('<div class="overlay"><i class="fa fa-refresh fa-spin"></i></div>');
+  $.post(base_url + "customers/delete_customer_sales_payment", {
+    payment_id: payment_id,
+    customer_id: customer_id
+  }).done(function (result) {
+    result = typeof result === "string" ? result.trim() : "";
+    if (result === "success") {
+      toastr["success"]("Customer payment deleted successfully.");
+      location.reload(true);
+    } else {
+      toastr["error"](result === "failed" || result === "" ? "Failed to delete payment. Try again." : result);
+    }
+  }).fail(function () {
+    toastr["error"]("Failed to delete payment. Try again.");
+  }).always(function () {
+    $(".overlay").remove();
+  });
+}
+
+function delete_customer_sales_payment_group(summary_id, customer_id, allocation_count) {
+  if (!confirm("Delete this grouped customer payment and all " + allocation_count + " invoice allocations? The affected invoice balances will be recalculated. This cannot be undone.")) {
+    return;
+  }
+  var base_url = $("#base_url").val().trim();
+  $(".box").append('<div class="overlay"><i class="fa fa-refresh fa-spin"></i></div>');
+  $.post(base_url + "customers/delete_customer_sales_payment_group", {
+    summary_id: summary_id,
+    customer_id: customer_id
+  }).done(function (result) {
+    result = typeof result === "string" ? result.trim() : "";
+    if (result === "success") {
+      toastr["success"]("Grouped customer payment and its allocations deleted successfully.");
+      location.reload(true);
+    } else {
+      toastr["error"](result === "failed" || result === "" ? "Failed to delete grouped payment. Try again." : result);
+    }
+  }).fail(function () {
+    toastr["error"]("Failed to delete grouped payment. Try again.");
+  }).always(function () {
+    $(".overlay").remove();
+  });
 }
