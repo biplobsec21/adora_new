@@ -308,6 +308,7 @@ class Due_generation_model extends CI_Model
         $generation_already_reconciled = $generation->status === 'Reconciled';
         $cut_items = array();
         $completed_batch_items = $this->db
+            ->select('i.*')
             ->from('db_cost_cutting_items AS i')
             ->join('db_cost_cutting_batches AS b', 'b.id = i.batch_id')
             ->where('i.batch_id', (int) $batch_id)
