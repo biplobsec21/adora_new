@@ -131,8 +131,18 @@
                                 <?php } ?>
                             </tbody>
                             <tfoot>
+                                <tr class="bg-primary">
+                                    <th>Row</th>
+                                    <th>Customer Number</th>
+                                    <th>Customer</th>
+                                    <th>Due (At upload)</th>
+                                    <th>Cutting Amount</th>
+                                    <th>Due After Cutting</th>
+                                    <th>Result</th>
+                                    <th>Validation</th>
+                                </tr>
                                 <tr class="bg-gray">
-                                    <th colspan="3">Total</th>
+                                    <th colspan="3" class="text-right">Totals</th>
                                     <th><?= app_number_format($total_due_at_upload); ?></th>
                                     <th><?= app_number_format($total_cutting_amount); ?></th>
                                     <th><?= app_number_format($total_due_after_cutting); ?></th>
@@ -154,6 +164,12 @@
                     </div>
                 </div>
                 <?php if (!empty($batch_errors)) { ?>
+                    <?php
+                    $total_requested_cutting = 0;
+                    foreach ($batch_errors as $item) {
+                        $total_requested_cutting += (float) $item->cutting_amount;
+                    }
+                    ?>
                     <div class="box box-danger">
                         <div class="box-header with-border">
                             <h3 class="box-title">CSV Rows Not Matched / Processed (<?= count($batch_errors); ?>)</h3>
@@ -212,6 +228,13 @@
                                             </tr>
                                         <?php } ?>
                                     </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th colspan="3" class="text-right">Total Requested Cutting</th>
+                                            <th><?= app_number_format($total_requested_cutting); ?></th>
+                                            <th colspan="4"></th>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>
