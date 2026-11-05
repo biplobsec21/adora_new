@@ -361,6 +361,123 @@ class Due_generation_model extends CI_Model
         return array('success' => $this->db->trans_status(), 'found' => true, 'message' => 'DueFlow was synchronized with Cost Cutting.');
     }
 
+    public function reconcile_manual_cost_cutting_item($batch_id, $item_id, $user_data)
+    {
+        $batch = $this->db->get_where('db_cost_cutting_batches', array(
+            'id' => (int) $batch_id,
+            'status' => 'Completed',
+        ))->row();
+        $cost_cutting_item = $this->db->get_where('db_cost_cutting_items', array(
+            'id' => (int) $item_id,
+            'batch_id' => (int) $batch_id,
+        ))->row();
+        if (!$batch || !$cost_cutting_item) {
+            return array('success' => false, 'found' => false, 'message' => 'The manual Cost Cutting item could not be found.');
+        }
+
+        $period_start = date('Y-m-01', strtotime($batch->payment_period));
+        $period_end = date('Y-m-01', strtotime($period_start . ' +1 month'));
+        $generation = $this->db->where('generation_type', 'Monthly Cycle')
+            ->where('due_cycle_date >=', $period_start)
+            ->where('due_cycle_date <', $period_end)
+            ->order_by('due_cycle_date', 'DESC')
+            ->limit(1)
+            ->get('db_due_generations')
+            ->row();
+        if (!$generation) {
+            $generation = $this->db->where('generation_type', 'Opening Balance')
+                ->where('due_cycle_date >=', $period_start)
+                ->where('due_cycle_date <', $period_end)
+                ->order_by('due_cycle_date', 'DESC')
+                ->limit(1)
+                ->get('db_due_generations')
+                ->row();
+        }
+        if (!$generation) {
+            return array('success' => true, 'found' => false, 'message' => 'No DueFlow generation exists for this Cost Cutting period.');
+        }
+
+        $generation_item = $this->db->query(
+            'SELECT * FROM db_due_generation_items WHERE generation_id = ? AND customer_id = ? FOR UPDATE',
+            array((int) $generation->id, (int) $cost_cutting_item->customer_id)
+        )->row();
+        if (!$generation_item) {
+            return array('success' => true, 'found' => false, 'message' => 'No DueFlow row exists for the selected customer in this period.');
+        }
+        $this->db->query(
+            'SELECT id FROM db_due_generations WHERE id = ? FOR UPDATE',
+            array((int) $generation->id)
+        );
+
+        $remaining_generation_due = max(
+            0,
+            (float) $generation_item->total_due_amount - (float) $generation_item->actually_cut_amount
+        );
+        $cut_amount = min((float) $cost_cutting_item->new_paid_amount, $remaining_generation_due);
+        $new_cut_amount = round((float) $generation_item->actually_cut_amount + $cut_amount, 2);
+        $current_customer_due = $this->get_customer_current_due(
+            (int) $cost_cutting_item->customer_id,
+            $user_data['CUR_DATE']
+        );
+        $remaining_due = min(
+            max(0, round((float) $generation_item->total_due_amount - $new_cut_amount, 2)),
+            $current_customer_due
+        );
+        $status = $remaining_due > 0
+            ? ($new_cut_amount > 0 ? 'Carried Forward' : 'Unpaid')
+            : ($new_cut_amount > 0 ? 'Fully Cut' : 'Paid Outside Cost Cutting');
+        if (!$this->db->where('id', (int) $generation_item->id)->update('db_due_generation_items', array(
+            'actually_cut_amount' => $new_cut_amount,
+            'remaining_due_amount' => $remaining_due,
+            'status' => $status,
+        ))) {
+            return array('success' => false, 'found' => true, 'message' => 'The DueFlow row could not be updated.');
+        }
+
+        if ((float) $cost_cutting_item->cutting_amount > (float) $cost_cutting_item->new_paid_amount) {
+            $existing_refund = $this->db->get_where('db_due_generation_refunds', array(
+                'cost_cutting_item_id' => (int) $cost_cutting_item->id,
+            ))->row();
+            if (!$existing_refund) {
+                $refund_amount = round(
+                    (float) $cost_cutting_item->cutting_amount - (float) $cost_cutting_item->new_paid_amount,
+                    2
+                );
+                if (!$this->db->insert('db_due_generation_refunds', array(
+                    'customer_id' => (int) $generation_item->customer_id,
+                    'generation_id' => (int) $generation->id,
+                    'generation_item_id' => (int) $generation_item->id,
+                    'cost_cutting_batch_id' => (int) $batch_id,
+                    'cost_cutting_item_id' => (int) $cost_cutting_item->id,
+                    'refund_amount' => $refund_amount,
+                    'status' => 'Pending',
+                    'generated_by' => $user_data['CUR_USERNAME'],
+                    'generated_at' => date('Y-m-d H:i:s'),
+                    'system_ip' => $user_data['SYSTEM_IP'],
+                ))) {
+                    return array('success' => false, 'found' => true, 'message' => 'The pending refund record could not be created.');
+                }
+            }
+        }
+
+        $summary_updated = $this->db->query(
+            'UPDATE db_due_generations
+             SET total_cut_amount = total_cut_amount + ?,
+                 total_remaining_due = total_remaining_due + ?
+             WHERE id = ?',
+            array(
+                round($new_cut_amount - (float) $generation_item->actually_cut_amount, 2),
+                round($remaining_due - (float) $generation_item->remaining_due_amount, 2),
+                (int) $generation->id,
+            )
+        );
+        if (!$summary_updated) {
+            return array('success' => false, 'found' => true, 'message' => 'DueFlow generation totals could not be updated.');
+        }
+
+        return array('success' => $this->db->trans_status(), 'found' => true, 'message' => 'The selected customer was reconciled with DueFlow.');
+    }
+
     public function reconcile($generation_id, $result_path, $user_data)
     {
         $generation = $this->get_generation($generation_id);

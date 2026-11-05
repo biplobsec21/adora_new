@@ -33,6 +33,20 @@ class Cost_cutting_model extends CI_Model
             return null;
         }
 
+        return $this->build_customer_snapshot($customer);
+    }
+
+    public function get_customer_snapshot_by_id($customer_id)
+    {
+        $customer = $this->db->get_where('db_customers', array(
+            'id' => (int) $customer_id,
+            'status' => 1,
+        ))->row();
+        return $customer ? $this->build_customer_snapshot($customer) : null;
+    }
+
+    private function build_customer_snapshot($customer)
+    {
         $opening_paid = (float) $this->db->select_sum('payment')
             ->where(array('customer_id' => $customer->id, 'status' => 1))
             ->get('db_cobpayments')->row()->payment;
@@ -163,6 +177,258 @@ class Cost_cutting_model extends CI_Model
             'batch_id' => (int) $batch_id,
             'blocks_processing' => 1,
         ))->count_all_results('db_cost_cutting_batch_errors');
+    }
+
+    public function get_batch_error($batch_id, $error_id)
+    {
+        return $this->db->get_where('db_cost_cutting_batch_errors', array(
+            'id' => (int) $error_id,
+            'batch_id' => (int) $batch_id,
+        ))->row();
+    }
+
+    public function get_error_customer_candidates($batch_id, $error_id, $search = '')
+    {
+        $batch = $this->get_batch($batch_id);
+        $error = $this->get_batch_error($batch_id, $error_id);
+        if (!$batch || $batch->status !== 'Completed' || !$error || $error->resolved_at) {
+            return array();
+        }
+
+        $search = trim((string) $search);
+        $source_name = trim((string) $error->customer_name);
+        if ($search === '' || strcasecmp($search, $source_name) === 0) {
+            $search = preg_replace('/^(?:[a-z]{1,8}-\s*)?\d+\s+/iu', '', $source_name);
+        }
+        $tokens = preg_split('/[^\p{L}\p{N}]+/u', $search, -1, PREG_SPLIT_NO_EMPTY);
+        $tokens = array_values(array_filter($tokens, function ($token) {
+            return function_exists('mb_strlen') ? mb_strlen($token, 'UTF-8') >= 3 : strlen($token) >= 3;
+        }));
+        if (!$tokens) {
+            return array();
+        }
+
+        $this->db->select('id, customer_number, customer_name')
+            ->from('db_customers')
+            ->where('status', 1);
+        foreach ($tokens as $token) {
+            $this->db->like('customer_name', $token);
+        }
+        $customers = $this->db
+            ->limit(200)
+            ->get()
+            ->result();
+
+        $candidates = array();
+        foreach ($customers as $customer) {
+            $normalized_name = $this->normalize_customer_name($customer->customer_name);
+            $score = 0;
+            foreach ($tokens as $token) {
+                if (strpos($normalized_name, $this->normalize_customer_name($token)) !== false) {
+                    $score++;
+                }
+            }
+            if ($score > 0) {
+                $customer->match_score = $score;
+                $candidates[] = $customer;
+            }
+        }
+        usort($candidates, function ($left, $right) {
+            if ($left->match_score === $right->match_score) {
+                return strcasecmp($left->customer_name, $right->customer_name);
+            }
+            return $right->match_score <=> $left->match_score;
+        });
+
+        return array_slice($candidates, 0, 50);
+    }
+
+    public function preview_batch_error_customer($batch_id, $error_id, $customer_id)
+    {
+        $batch = $this->get_batch($batch_id);
+        $error = $this->get_batch_error($batch_id, $error_id);
+        if (!$batch || $batch->status !== 'Completed' || !$error || $error->resolved_at) {
+            return null;
+        }
+        $snapshot = $this->get_customer_snapshot_by_id($customer_id);
+        if (!$snapshot) {
+            return null;
+        }
+
+        return array(
+            'customer_id' => $snapshot['customer_id'],
+            'customer_number' => $snapshot['customer_number'],
+            'customer_name' => $snapshot['customer_name'],
+            'current_due' => $snapshot['due_amount'],
+            'due_at_upload' => $this->get_dueflow_snapshot_amount($batch, $customer_id),
+        );
+    }
+
+    private function get_dueflow_snapshot_amount($batch, $customer_id)
+    {
+        $period_start = date('Y-m-01', strtotime($batch->payment_period));
+        $period_end = date('Y-m-01', strtotime($period_start . ' +1 month'));
+        $generation = $this->db->where('generation_type', 'Monthly Cycle')
+            ->where('due_cycle_date >=', $period_start)
+            ->where('due_cycle_date <', $period_end)
+            ->order_by('due_cycle_date', 'DESC')
+            ->limit(1)
+            ->get('db_due_generations')
+            ->row();
+        if (!$generation) {
+            $generation = $this->db->where('generation_type', 'Opening Balance')
+                ->where('due_cycle_date >=', $period_start)
+                ->where('due_cycle_date <', $period_end)
+                ->order_by('due_cycle_date', 'DESC')
+                ->limit(1)
+                ->get('db_due_generations')
+                ->row();
+        }
+        if (!$generation) {
+            return null;
+        }
+        $item = $this->db->select('total_due_amount')
+            ->get_where('db_due_generation_items', array(
+                'generation_id' => (int) $generation->id,
+                'customer_id' => (int) $customer_id,
+            ))->row();
+        return $item ? (float) $item->total_due_amount : null;
+    }
+
+    public function apply_batch_error($batch_id, $error_id, $customer_id, $user_data)
+    {
+        $this->db->trans_begin();
+        $batch = $this->db->query(
+            'SELECT * FROM db_cost_cutting_batches WHERE id = ? FOR UPDATE',
+            array((int) $batch_id)
+        )->row();
+        $error = $this->db->query(
+            'SELECT * FROM db_cost_cutting_batch_errors WHERE id = ? AND batch_id = ? FOR UPDATE',
+            array((int) $error_id, (int) $batch_id)
+        )->row();
+        $customer = $this->db->query(
+            'SELECT * FROM db_customers WHERE id = ? AND status = 1 FOR UPDATE',
+            array((int) $customer_id)
+        )->row();
+
+        if (!$batch || $batch->status !== 'Completed' || !$error || $error->resolved_at || (int) $error->blocks_processing !== 0 || !$customer) {
+            $this->db->trans_rollback();
+            return array('success' => false, 'message' => 'This CSV error row is no longer available for manual Cost Cutting.');
+        }
+        $existing_item = $this->db->get_where('db_cost_cutting_items', array(
+            'batch_id' => (int) $batch_id,
+            'customer_id' => (int) $customer_id,
+        ))->row();
+        $existing_resolution = $this->db->get_where('db_cost_cutting_batch_errors', array(
+            'batch_id' => (int) $batch_id,
+            'resolved_customer_id' => (int) $customer_id,
+        ))->row();
+        if ($existing_item || $existing_resolution) {
+            $this->db->trans_rollback();
+            return array('success' => false, 'message' => 'This customer already has a Cost Cutting entry in this batch.');
+        }
+
+        $snapshot = $this->get_customer_snapshot_by_id($customer_id);
+        $requested_amount = (float) $error->cutting_amount;
+        if (!$snapshot || $requested_amount <= 0 || (float) $snapshot['due_amount'] <= 0) {
+            $this->db->trans_rollback();
+            return array('success' => false, 'message' => 'The selected customer has no current due to apply this Cost Cutting amount to.');
+        }
+        $applied_amount = min($requested_amount, (float) $snapshot['due_amount']);
+        $due_at_upload = $this->get_dueflow_snapshot_amount($batch, $customer_id);
+        $due_for_item = $due_at_upload === null ? (float) $snapshot['due_amount'] : $due_at_upload;
+        $payment_note = $batch->batch_number . ' CSV row ' . (int) $error->source_row_number;
+        if (!$this->allocate_cost_cutting_payment(
+            (int) $customer_id,
+            $applied_amount,
+            $user_data['CUR_DATE'],
+            $payment_note,
+            $user_data
+        ) || !$this->refresh_customer_sales_due((int) $customer_id)) {
+            $this->db->trans_rollback();
+            return array('success' => false, 'message' => 'The manual Cost Cutting payment could not be recorded.');
+        }
+
+        $new_status = $applied_amount >= (float) $snapshot['due_amount']
+            ? 'Paid'
+            : ($applied_amount > 0 ? 'Partial Paid' : 'Unpaid');
+        $item_saved = $this->add_item($batch_id, array(
+            'source_row_number' => (int) $error->source_row_number,
+            'customer_id' => (int) $customer_id,
+            'customer_code' => $snapshot['customer_number'],
+            'customer_name' => $snapshot['customer_name'],
+            'due_amount' => $due_for_item,
+            'cutting_amount' => $requested_amount,
+            'previous_status' => $snapshot['status'],
+            'previous_paid_amount' => (float) $snapshot['paid_amount'],
+            'new_status' => $new_status,
+            'new_paid_amount' => $applied_amount,
+            'validation_status' => 'Valid',
+            'validation_error' => $requested_amount > $applied_amount
+                ? 'Overpaid by ' . number_format($requested_amount - $applied_amount, 2) . '; processing was capped at the current due.'
+                : null,
+        ));
+        if (!$item_saved) {
+            $this->db->trans_rollback();
+            return array('success' => false, 'message' => 'The manual Cost Cutting item could not be added to this batch.');
+        }
+        $payment_item_id = (int) $this->db->insert_id();
+        if (!$this->db->where(array('id' => (int) $error_id, 'batch_id' => (int) $batch_id))->update(
+            'db_cost_cutting_batch_errors',
+            array(
+                'due_at_upload' => $due_at_upload,
+                'resolved_customer_id' => (int) $customer_id,
+                'resolved_customer_number' => $snapshot['customer_number'],
+                'resolved_customer_name' => $snapshot['customer_name'],
+                'applied_amount' => $applied_amount,
+                'payment_item_id' => $payment_item_id,
+                'resolved_by' => $user_data['CUR_USERNAME'],
+                'resolved_at' => date('Y-m-d H:i:s'),
+            )
+        )) {
+            $this->db->trans_rollback();
+            return array('success' => false, 'message' => 'The CSV error row resolution could not be saved.');
+        }
+
+        if (!$this->refresh_batch_summary($batch_id)) {
+            $this->db->trans_rollback();
+            return array('success' => false, 'message' => 'The Cost Cutting batch summary could not be updated.');
+        }
+        $this->load->model('due_generation_model', 'due_generation');
+        $sync_result = $this->due_generation->reconcile_manual_cost_cutting_item($batch_id, $payment_item_id, $user_data);
+        if (!$sync_result['success'] || !$this->db->trans_status()) {
+            $this->db->trans_rollback();
+            return array(
+                'success' => false,
+                'message' => $sync_result['message'] ?: 'Manual Cost Cutting could not be synchronized with DueFlow.',
+            );
+        }
+
+        $this->db->trans_commit();
+        return array(
+            'success' => true,
+            'message' => 'Manual Cost Cutting applied: ' . number_format($applied_amount, 2)
+                . ($due_at_upload === null ? '. No matching DueFlow row was found.' : ' and added to the batch and DueFlow.')
+                . ($applied_amount < $requested_amount ? ' The amount was capped at the current due.' : ''),
+        );
+    }
+
+    private function refresh_batch_summary($batch_id)
+    {
+        $items = $this->db->select('COUNT(*) AS valid_records, COALESCE(SUM(due_amount), 0) AS total_due_amount, COALESCE(SUM(cutting_amount), 0) AS total_cutting_amount, SUM(new_status = "Paid") AS paid_count, SUM(new_status = "Partial Paid") AS partial_count, SUM(new_status = "Unpaid") AS unpaid_count')
+            ->get_where('db_cost_cutting_items', array('batch_id' => (int) $batch_id))
+            ->row();
+        $errors = $this->db->where(array('batch_id' => (int) $batch_id, 'resolved_at' => null))
+            ->count_all_results('db_cost_cutting_batch_errors');
+        return $this->db->where('id', (int) $batch_id)->update('db_cost_cutting_batches', array(
+            'valid_records' => (int) $items->valid_records,
+            'error_records' => (int) $errors,
+            'total_due_amount' => (float) $items->total_due_amount,
+            'total_cutting_amount' => (float) $items->total_cutting_amount,
+            'paid_count' => (int) $items->paid_count,
+            'partial_count' => (int) $items->partial_count,
+            'unpaid_count' => (int) $items->unpaid_count,
+        ));
     }
 
     public function get_completed_batch_for_customer($payment_period, $customer_number, $exclude_batch_id = 0)

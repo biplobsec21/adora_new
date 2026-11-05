@@ -184,7 +184,7 @@ class Cost_cutting extends MY_Controller
                 }
                 $this->cost_cutting->add_batch_error($batch_id, array(
                     'source_row_number' => $row_number,
-                    'customer_code' => $columns['name'] === false && $customer_number !== '' ? $customer_number : null,
+                    'customer_number' => $customer_number !== '' ? $customer_number : null,
                     'customer_name' => $customer_name,
                     'cutting_amount' => $cutting_amount,
                     'error_type' => $error_type,
@@ -236,6 +236,53 @@ class Cost_cutting extends MY_Controller
         $this->load->model('sms_service_model', 'sms_service');
         $data['sms_settings'] = $this->sms_service->get_settings();
         $this->load->view('cost-cutting/review', $data);
+    }
+
+    public function error_customer_candidates($batch_id, $error_id)
+    {
+        $this->permission_check_with_msg('payment_management_record');
+        $search = trim((string) $this->input->get('q', true));
+        $candidates = $this->cost_cutting->get_error_customer_candidates(
+            (int) $batch_id,
+            (int) $error_id,
+            $search
+        );
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode(array('customers' => $candidates)));
+    }
+
+    public function error_customer_preview($batch_id, $error_id)
+    {
+        $this->permission_check_with_msg('payment_management_record');
+        $customer_id = (int) $this->input->get('customer_id');
+        $preview = $this->cost_cutting->preview_batch_error_customer(
+            (int) $batch_id,
+            (int) $error_id,
+            $customer_id
+        );
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode(array(
+                'success' => $preview !== null,
+                'preview' => $preview,
+            )));
+    }
+
+    public function apply_error_customer($batch_id, $error_id)
+    {
+        $this->permission_check_with_msg('payment_management_record');
+        if ($this->input->method(true) !== 'POST') {
+            show_error('Manual Cost Cutting must be submitted with POST.', 405);
+        }
+        $result = $this->cost_cutting->apply_batch_error(
+            (int) $batch_id,
+            (int) $error_id,
+            (int) $this->input->post('customer_id'),
+            $this->data
+        );
+        $this->session->set_flashdata($result['success'] ? 'success' : 'error', $result['message']);
+        redirect(base_url('cost_cutting/review/' . (int) $batch_id), 'refresh');
     }
 
     public function sms_preview($batch_id)

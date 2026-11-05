@@ -160,7 +160,7 @@
                         </div>
                         <div class="box-body">
                             <?php if ($batch->status === 'Completed') { ?>
-                                <p>These CSV rows were stored separately because they failed validation. They were not included in the processed payment items or reconciliation.</p>
+                                <p>Unmatched CSV rows are stored separately. Rows already manually applied are linked to the selected customer and included in this batch; unresolved rows have not been applied.</p>
                             <?php } else { ?>
                                 <p>These CSV rows are stored separately and will not be applied. Correct blocking errors before processing; unmatched names can be handled in a later upload.</p>
                             <?php } ?>
@@ -169,22 +169,46 @@
                                     <thead class="bg-red">
                                         <tr>
                                             <th>CSV Row</th>
-                                            <th>Customer Number</th>
+                                            <th>CSV Number</th>
                                             <th>Customer Name</th>
                                             <th>Requested Cutting</th>
                                             <th>Reason Not Processed</th>
                                             <th>Payment Applied</th>
+                                            <th>Selected Customer</th>
+                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php foreach ($batch_errors as $item) { ?>
                                             <tr class="danger">
                                                 <td><?= (int) $item->source_row_number; ?></td>
-                                                <td><?= html_escape($item->customer_code ?: '-'); ?></td>
+                                                <td><?= html_escape($item->customer_number ?: '-'); ?></td>
                                                 <td><?= html_escape($item->customer_name ?: '-'); ?></td>
                                                 <td><?= $item->cutting_amount === null ? '-' : app_number_format($item->cutting_amount); ?></td>
                                                 <td><?= html_escape($item->error_message); ?></td>
-                                                <td>0.00</td>
+                                                <td><?= $item->applied_amount === null ? '0.00' : app_number_format($item->applied_amount); ?></td>
+                                                <td>
+                                                    <?php if (!empty($item->resolved_customer_id)) { ?>
+                                                        <?= html_escape($item->resolved_customer_number . ' - ' . $item->resolved_customer_name); ?>
+                                                        <br><small>Applied by <?= html_escape($item->resolved_by); ?> at <?= html_escape($item->resolved_at); ?></small>
+                                                    <?php } else { ?>
+                                                        -
+                                                    <?php } ?>
+                                                </td>
+                                                <td>
+                                                    <?php if ($batch->status === 'Completed' && empty($item->resolved_at) && $CI->permissions('payment_management_record')) { ?>
+                                                        <button type="button" class="btn btn-xs btn-warning apply-batch-error"
+                                                            data-error-id="<?= (int) $item->id; ?>"
+                                                            data-customer-name="<?= html_escape($item->customer_name); ?>"
+                                                            data-cutting-amount="<?= html_escape($item->cutting_amount); ?>">
+                                                            <i class="fa fa-money"></i> Apply
+                                                        </button>
+                                                    <?php } elseif (!empty($item->resolved_at)) { ?>
+                                                        <span class="label label-success">Applied</span>
+                                                    <?php } else { ?>
+                                                        <span class="label label-default">Available after batch completion</span>
+                                                    <?php } ?>
+                                                </td>
                                             </tr>
                                         <?php } ?>
                                     </tbody>
@@ -197,9 +221,172 @@
         </div>
         <?php include APPPATH . 'views/footer.php'; ?>
     </div>
+    <div class="modal fade" id="apply-batch-error-modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <form method="post" id="apply-batch-error-form">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title">Apply Cost Cutting to Matched Customer</h4>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
+                        <input type="hidden" name="customer_id" id="apply-error-customer-id">
+                        <div class="form-group">
+                            <label>Customer name from CSV</label>
+                            <input type="text" id="apply-error-source-name" class="form-control" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Cutting amount from CSV</label>
+                            <input type="text" id="apply-error-requested-amount" class="form-control" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="apply-error-search">Find matching active customer</label>
+                            <input type="text" id="apply-error-search" class="form-control" autocomplete="off">
+                            <p class="help-block">Only active customers whose names match all search terms are listed. Confirm the selected customer's current number and name before applying.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="apply-error-customer-select">Current customer number and name</label>
+                            <select id="apply-error-customer-select" class="form-control" required>
+                                <option value="">Search for a customer</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>DueFlow period snapshot (not an upload-time balance)</label>
+                            <input type="text" id="apply-error-due-at-upload" class="form-control" readonly>
+                            <p class="help-block">This is the customer's DueFlow amount for the batch period, when available. It is not a balance reconstructed for the exact CSV upload time.</p>
+                        </div>
+                        <div class="form-group">
+                            <label>Current due</label>
+                            <input type="text" id="apply-error-current-due" class="form-control" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount to apply now</label>
+                            <input type="text" id="apply-error-amount-now" class="form-control" readonly>
+                        </div>
+                        <div id="apply-error-message" class="alert alert-warning" style="display:none"></div>
+                        <p class="text-danger">The payment is capped at the selected customer's current due and will be recorded in this completed batch. It cannot be applied twice to the same customer in the batch.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="apply-error-submit" disabled>Confirm Cost Cutting</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <?php include APPPATH . 'views/comman/code_js_datatable.php'; ?>
     <script>
         $('.cost-cutting-active-li').addClass('active');
+        (function() {
+            var batchId = <?= (int) $batch->id; ?>;
+            var baseUrl = <?= json_encode(base_url()); ?>;
+            var activeErrorId = 0;
+            var requestedAmount = 0;
+            var searchTimer = null;
+            var $modal = $('#apply-batch-error-modal');
+            var $select = $('#apply-error-customer-select');
+
+            function formatAmount(value) {
+                return Number(value || 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+
+            function loadCandidates(query) {
+                $select.html('<option value="">Searching...</option>').prop('disabled', true);
+                $('#apply-error-submit').prop('disabled', true);
+                $('#apply-error-message').hide().text('');
+                $.getJSON(baseUrl + 'cost_cutting/error_customer_candidates/' + batchId + '/' + activeErrorId, {
+                    q: query
+                }).done(function(response) {
+                    $select.empty().append($('<option>', {
+                        value: '',
+                        text: response.customers.length ? 'Select the correct customer' : 'No matching customers found'
+                    }));
+                    $.each(response.customers, function(_, customer) {
+                        $select.append($('<option>', {
+                            value: customer.id,
+                            text: customer.customer_number + ' - ' + customer.customer_name
+                        }));
+                    });
+                    $select.prop('disabled', false);
+                }).fail(function() {
+                    $select.html('<option value="">Could not load customer matches</option>').prop('disabled', true);
+                    $('#apply-error-message').text('Customer matches could not be loaded. Please try again.').show();
+                });
+            }
+
+            function loadCustomerPreview(customerId) {
+                $('#apply-error-customer-id').val('');
+                $('#apply-error-due-at-upload, #apply-error-current-due, #apply-error-amount-now').val('');
+                $('#apply-error-submit').prop('disabled', true);
+                if (!customerId) {
+                    return;
+                }
+                $.getJSON(baseUrl + 'cost_cutting/error_customer_preview/' + batchId + '/' + activeErrorId, {
+                    customer_id: customerId
+                }).done(function(response) {
+                    if (!response.success || !response.preview) {
+                        $('#apply-error-message').text('The selected customer is no longer available for this row.').show();
+                        return;
+                    }
+                    var preview = response.preview;
+                    var applied = Math.min(requestedAmount, Number(preview.current_due));
+                    $('#apply-error-customer-id').val(preview.customer_id);
+                    $('#apply-error-due-at-upload').val(preview.due_at_upload === null ? 'No matching DueFlow row' : formatAmount(preview.due_at_upload));
+                    $('#apply-error-current-due').val(formatAmount(preview.current_due));
+                    $('#apply-error-amount-now').val(formatAmount(applied));
+                    $('#apply-error-submit').prop('disabled', applied <= 0);
+                    if (applied <= 0) {
+                        $('#apply-error-message').text('This customer has no current due, so no Cost Cutting payment can be applied.').show();
+                    } else if (applied < requestedAmount) {
+                        $('#apply-error-message').text('The requested amount exceeds the current due. Only ' + formatAmount(applied) + ' will be applied.').show();
+                    } else {
+                        $('#apply-error-message').hide().text('');
+                    }
+                }).fail(function() {
+                    $('#apply-error-message').text('The selected customer due could not be loaded. Please try again.').show();
+                });
+            }
+
+            $('.apply-batch-error').on('click', function() {
+                var $button = $(this);
+                activeErrorId = Number($button.data('error-id'));
+                requestedAmount = Number($button.data('cutting-amount'));
+                $('#apply-error-source-name').val($button.data('customer-name'));
+                $('#apply-error-requested-amount').val(formatAmount(requestedAmount));
+                $('#apply-batch-error-form').attr('action', baseUrl + 'cost_cutting/apply_error_customer/' + batchId + '/' + activeErrorId);
+                $('#apply-error-search').val($button.data('customer-name'));
+                $('#apply-error-customer-id').val('');
+                $('#apply-error-due-at-upload, #apply-error-current-due, #apply-error-amount-now').val('');
+                $modal.modal('show');
+                loadCandidates($button.data('customer-name'));
+            });
+
+            $('#apply-error-search').on('input', function() {
+                var query = $(this).val();
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(function() {
+                    if (activeErrorId) {
+                        loadCandidates(query);
+                    }
+                }, 300);
+            });
+            $select.on('change', function() {
+                loadCustomerPreview($(this).val());
+            });
+            $('#apply-batch-error-form').on('submit', function(event) {
+                if (!$('#apply-error-customer-id').val()) {
+                    event.preventDefault();
+                    return;
+                }
+                if (!confirm('Apply this Cost Cutting amount to the selected customer? The payment will be recorded in this completed batch.')) {
+                    event.preventDefault();
+                }
+            });
+        })();
     </script>
 </body>
 
