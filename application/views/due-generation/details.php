@@ -27,6 +27,22 @@
                         <h3 class="box-title">Customer Due Ledger</h3>
                     </div>
                     <div class="box-body table-responsive">
+                        <?php
+                        $totals = array(
+                            'previous' => 0,
+                            'new_due' => 0,
+                            'total_due' => 0,
+                            'cut' => 0,
+                            'remaining' => 0,
+                        );
+                        foreach ($items as $item) {
+                            $totals['previous'] += (float) $item->previous_outstanding_amount;
+                            $totals['new_due'] += (float) $item->new_due_amount;
+                            $totals['total_due'] += (float) $item->total_due_amount;
+                            $totals['cut'] += (float) $item->actually_cut_amount;
+                            $totals['remaining'] += (float) $item->remaining_due_amount;
+                        }
+                        ?>
                         <table class="table table-bordered table-striped" id="dueflow-items">
                             <thead class="bg-primary">
                                 <tr>
@@ -67,6 +83,18 @@
                                         </td>
                                         <td><?= html_escape($item->status); ?></td>
                                     </tr><?php } ?></tbody>
+                            <tfoot>
+                                <tr class="bg-gray">
+                                    <th colspan="3">Total</th>
+                                    <th><?= app_number_format($totals['previous']); ?></th>
+                                    <th><?= app_number_format($totals['new_due']); ?></th>
+                                    <th><?= app_number_format($totals['total_due']); ?></th>
+                                    <th><?= app_number_format($totals['cut']); ?></th>
+                                    <th><?= app_number_format($totals['remaining']); ?></th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>

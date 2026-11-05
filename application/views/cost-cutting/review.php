@@ -19,10 +19,10 @@
             </section>
             <section class="content">
                 <?php include APPPATH . 'views/comman/code_flashdata.php'; ?>
-                <?php if ((int) $batch->error_records > 0) { ?>
+                <?php if ($batch->status === 'Completed') { ?>
+                    <div class="alert alert-success">Cost Cutting has been processed. Invalid rows were not applied; review their validation messages below.</div>
+                <?php } elseif ((int) $batch->error_records > 0) { ?>
                     <div class="alert alert-warning">Fix the invalid rows before processing. N/A customers are excluded from Cost Cutting and must be handled manually from the customer panel.</div>
-                <?php } elseif ($batch->status === 'Completed') { ?>
-                    <div class="alert alert-success">Cost Cutting has been processed. Payment records were updated.</div>
                 <?php } else { ?>
                     <div class="alert alert-info">Review is complete. No payment records have been changed.</div>
                 <?php } ?>
@@ -65,11 +65,19 @@
                         <h3 class="box-title">Uploaded File: <?= html_escape($batch->file_name); ?></h3>
                     </div>
                     <div class="box-body table-responsive">
+                        <h4>Valid Rows</h4>
                         <?php
                         $total_due_at_upload = 0;
                         $total_cutting_amount = 0;
                         $total_due_after_cutting = 0;
+                        $valid_items = array();
+                        $invalid_items = array();
                         foreach ($items as $item) {
+                            if ($item->validation_status === 'Invalid') {
+                                $invalid_items[] = $item;
+                                continue;
+                            }
+                            $valid_items[] = $item;
                             $total_due_at_upload += (float) $item->due_amount;
                             if ($item->cutting_amount !== null) {
                                 $requested_amount = max(0, (float) $item->cutting_amount);
@@ -93,7 +101,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($items as $item) { ?>
+                                <?php foreach ($valid_items as $item) { ?>
                                     <?php
                                     $due_after_cutting = null;
                                     if ($item->cutting_amount !== null) {
@@ -102,7 +110,7 @@
                                         $due_after_cutting = (float) $item->due_amount - $applied_amount;
                                     }
                                     ?>
-                                    <tr class="<?= $item->validation_status === 'Invalid' ? 'danger' : ((float) $item->cutting_amount > (float) $item->due_amount ? 'warning' : ''); ?>">
+                                    <tr class="<?= (float) $item->cutting_amount > (float) $item->due_amount ? 'warning' : ''; ?>">
                                         <td><?= (int) $item->source_row_number; ?></td>
                                         <td><?= html_escape($item->customer_code); ?></td>
                                         <td>
@@ -150,6 +158,46 @@
                         <a href="<?= $base_url; ?>cost_cutting" class="btn btn-default">Upload Another File</a>
                     </div>
                 </div>
+                <?php if (!empty($invalid_items)) { ?>
+                    <div class="box box-danger">
+                        <div class="box-header with-border">
+                            <h3 class="box-title">Invalid / Not Processed Rows (<?= count($invalid_items); ?>)</h3>
+                        </div>
+                        <div class="box-body">
+                            <?php if ($batch->status === 'Completed') { ?>
+                                <p>This batch was already processed. These invalid rows were not applied and were not part of the reconciliation.</p>
+                            <?php } else { ?>
+                                <p>These rows were not processed. Fix the customer match or validation issue before uploading them again.</p>
+                            <?php } ?>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped">
+                                    <thead class="bg-red">
+                                        <tr>
+                                            <th>CSV Row</th>
+                                            <th>Customer Number</th>
+                                            <th>Customer Name</th>
+                                            <th>Requested Cutting</th>
+                                            <th>Reason Not Processed</th>
+                                            <th>Payment Applied</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($invalid_items as $item) { ?>
+                                            <tr class="danger">
+                                                <td><?= (int) $item->source_row_number; ?></td>
+                                                <td><?= html_escape($item->customer_code ?: '-'); ?></td>
+                                                <td><?= html_escape($item->customer_name ?: '-'); ?></td>
+                                                <td><?= $item->cutting_amount === null ? '-' : app_number_format($item->cutting_amount); ?></td>
+                                                <td><?= html_escape($item->validation_error ?: 'Invalid row'); ?></td>
+                                                <td><?= app_number_format($item->new_paid_amount ?? 0); ?></td>
+                                            </tr>
+                                        <?php } ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                <?php } ?>
             </section>
         </div>
         <?php include APPPATH . 'views/footer.php'; ?>

@@ -46,6 +46,7 @@
                                 <th>Cycle</th>
                                 <th>Records</th>
                                 <th>Total Due</th>
+                                <th>Reconciled Amount</th>
                                 <th>Remaining</th>
                                 <th>Overpaid (Customers / Amount)</th>
                                 <th>Status</th>
@@ -58,6 +59,7 @@
                                     <td><?= $generation->generation_type === 'Opening Balance' ? 'Initial Due Setup (' . html_escape(date('F Y', strtotime($generation->due_cycle_date))) . ')' : html_escape(date('F Y', strtotime($generation->due_cycle_date))); ?></td>
                                     <td><?= (int) $generation->total_records; ?></td>
                                     <td><?= app_number_format($generation->total_due_amount); ?></td>
+                                    <td><?= app_number_format($generation->total_cut_amount); ?></td>
                                     <td><?= app_number_format($generation->total_remaining_due); ?></td>
                                     <td>
                                         <?php if ($generation->overpaid_count > 0) { ?>

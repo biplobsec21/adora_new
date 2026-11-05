@@ -96,7 +96,6 @@ class Cost_cutting extends MY_Controller
         $seen = array();
         $summary = array('total_records' => 0, 'valid_records' => 0, 'error_records' => 0, 'total_due_amount' => 0, 'total_cutting_amount' => 0, 'paid_count' => 0, 'partial_count' => 0, 'unpaid_count' => 0);
         $row_number = 1;
-        $skipped_name_rows = 0;
         while (($row = fgetcsv($handle)) !== false) {
             $row_number++;
             if (count(array_filter($row, 'strlen')) === 0) {
@@ -106,43 +105,57 @@ class Cost_cutting extends MY_Controller
             $customer_number = trim((string) ($row[$columns['customer']] ?? ''));
             $customer_name = $columns['name'] === false ? null : trim((string) ($row[$columns['name']] ?? ''));
             $raw_cutting = trim((string) ($row[$columns['cutting']] ?? ''));
-            $snapshot = $columns['name'] !== false
-                ? $this->cost_cutting->get_customer_snapshot_by_name($customer_name)
-                : $this->cost_cutting->get_customer_snapshot($customer_number);
-            if ($columns['name'] !== false && !$snapshot) {
-                $skipped_name_rows++;
-                continue;
+            $name_match_count = null;
+            if ($columns['name'] !== false) {
+                $name_match = $this->cost_cutting->find_customer_snapshot_by_name($customer_name);
+                $snapshot = $name_match['snapshot'];
+                $name_match_count = $name_match['match_count'];
+            } else {
+                $snapshot = $this->cost_cutting->get_customer_snapshot($customer_number);
             }
             if ($snapshot) {
                 $customer_number = $snapshot['customer_number'];
             }
             $normalized_number = strtoupper($customer_number);
-            $error = '';
+            $errors = array();
             $validation_message = null;
             $cutting_amount = null;
 
-            if ($columns['name'] === false && $customer_number === '') {
-                $error = 'Customer Number is required.';
-            } elseif ($normalized_number === 'N/A') {
-                $error = 'N/A customers must be processed manually from the customer panel.';
-            } elseif (isset($seen[$normalized_number])) {
-                $error = 'Duplicate Customer Number.';
-            } elseif ($raw_cutting === '' || !is_numeric(str_replace(',', '', $raw_cutting))) {
-                $error = 'Cutting Amount must be numeric.';
+            if ($columns['name'] !== false) {
+                if ($customer_name === '') {
+                    $errors[] = 'Customer Name is required.';
+                } elseif ($name_match_count === 0) {
+                    $errors[] = 'No active customer matched this name.';
+                } elseif ($name_match_count > 1) {
+                    $errors[] = 'Customer name matched more than one active customer.';
+                }
+            } elseif ($customer_number === '') {
+                $errors[] = 'Customer Number is required.';
+            }
+            if ($snapshot && $normalized_number === 'N/A') {
+                $errors[] = 'N/A customers must be processed manually from the customer panel.';
+            }
+            if (($snapshot || $columns['name'] === false) && isset($seen[$normalized_number])) {
+                $errors[] = 'Duplicate Customer Number.';
+            } elseif ($snapshot || ($columns['name'] === false && $customer_number !== '')) {
+                $seen[$normalized_number] = true;
+            }
+            if ($raw_cutting === '' || !is_numeric(str_replace(',', '', $raw_cutting))) {
+                $errors[] = 'Cutting Amount must be numeric.';
             } else {
                 $cutting_amount = (float) str_replace(',', '', $raw_cutting);
                 if ($cutting_amount < 0) {
-                    $error = 'Cutting Amount cannot be negative.';
+                    $errors[] = 'Cutting Amount cannot be negative.';
                 }
             }
-            $seen[$normalized_number] = true;
 
-            if ($error === '' && !$snapshot) {
-                $error = 'Customer Number Not Found.';
+            if ($columns['name'] === false && !$snapshot && $customer_number !== '') {
+                $errors[] = 'Customer Number Not Found.';
             }
-            if ($error === '' && ($processed_batch = $this->cost_cutting->get_completed_batch_for_customer($period . '-01', $customer_number)) !== null) {
-                $error = 'Customer already processed in batch ' . $processed_batch->batch_number . ' for this payment period.';
+            if (!$errors && ($processed_batch = $this->cost_cutting->get_completed_batch_for_customer($period . '-01', $customer_number)) !== null) {
+                $errors[] = 'Customer already processed in batch ' . $processed_batch->batch_number . ' for this payment period.';
             }
+            $error = implode(' ', $errors);
             $new_status = null;
             $due_amount = $snapshot ? $snapshot['due_amount'] : 0;
             if ($error === '') {
@@ -161,14 +174,14 @@ class Cost_cutting extends MY_Controller
             $this->cost_cutting->add_item($batch_id, array(
                 'source_row_number' => $row_number,
                 'customer_id' => $snapshot ? $snapshot['customer_id'] : null,
-                'customer_code' => $customer_number !== '' ? $customer_number : null,
+                'customer_code' => $snapshot ? $customer_number : ($columns['name'] === false && $customer_number !== '' ? $customer_number : null),
                 'customer_name' => $customer_name,
                 'due_amount' => $due_amount,
                 'cutting_amount' => $cutting_amount,
                 'previous_status' => $snapshot ? $snapshot['status'] : null,
                 'previous_paid_amount' => $snapshot ? $snapshot['paid_amount'] : null,
                 'new_status' => $new_status,
-                'new_paid_amount' => $cutting_amount,
+                'new_paid_amount' => $error === '' ? $cutting_amount : null,
                 'validation_status' => $error === '' ? 'Valid' : 'Invalid',
                 'validation_error' => $error !== '' ? $error : $validation_message,
             ));
@@ -181,12 +194,6 @@ class Cost_cutting extends MY_Controller
             show_error('Cost Cutting upload could not be saved.', 500);
         }
         $this->db->trans_commit();
-        if ($skipped_name_rows > 0) {
-            $this->session->set_flashdata(
-                'warning',
-                $skipped_name_rows . ' CSV row(s) were ignored because the customer name did not match exactly one active customer.'
-            );
-        }
         redirect(base_url('cost_cutting/review/' . $batch_id));
     }
 

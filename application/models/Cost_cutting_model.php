@@ -57,12 +57,14 @@ class Cost_cutting_model extends CI_Model
         );
     }
 
-    public function get_customer_snapshot_by_name($customer_name)
+    public function find_customer_snapshot_by_name($customer_name)
     {
         $normalized_name = $this->normalize_customer_name($customer_name);
         if ($normalized_name === '') {
-            return null;
+            return array('snapshot' => null, 'match_count' => 0);
         }
+        $name_without_number = preg_replace('/^(?:[a-z]{1,8}-\s*)?\d+\s+/u', '', $normalized_name);
+        $name_keys = array_unique(array_filter(array($normalized_name, $name_without_number)));
 
         if ($this->customer_name_index === null) {
             $this->customer_name_index = array();
@@ -78,20 +80,26 @@ class Cost_cutting_model extends CI_Model
                 }
                 $this->customer_name_index[$name_key][] = $customer->customer_number;
 
-                $name_without_number = preg_replace('/^(?:[a-z]{1,8}-)?\d+\s+/u', '', $name_key);
+                $name_without_number = preg_replace('/^(?:[a-z]{1,8}-\s*)?\d+\s+/u', '', $name_key);
                 if ($name_without_number !== $name_key && $name_without_number !== '') {
                     $this->customer_name_index[$name_without_number][] = $customer->customer_number;
                 }
             }
         }
 
-        $matches = $this->customer_name_index[$normalized_name] ?? array();
+        $matches = array();
+        foreach ($name_keys as $name_key) {
+            $matches = array_merge($matches, $this->customer_name_index[$name_key] ?? array());
+        }
         $matches = array_values(array_unique($matches));
         if (count($matches) !== 1) {
-            return null;
+            return array('snapshot' => null, 'match_count' => count($matches));
         }
 
-        return $this->get_customer_snapshot($matches[0]);
+        return array(
+            'snapshot' => $this->get_customer_snapshot($matches[0]),
+            'match_count' => 1,
+        );
     }
 
     private function normalize_customer_name($customer_name)
