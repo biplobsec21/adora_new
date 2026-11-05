@@ -120,6 +120,12 @@ class Cost_cutting_model extends CI_Model
         return $this->db->insert('db_cost_cutting_items', $item);
     }
 
+    public function add_batch_error($batch_id, $error)
+    {
+        $error['batch_id'] = (int) $batch_id;
+        return $this->db->insert('db_cost_cutting_batch_errors', $error);
+    }
+
     public function update_batch_summary($batch_id, $summary)
     {
         return $this->db->where('id', $batch_id)->update('db_cost_cutting_batches', $summary);
@@ -144,6 +150,21 @@ class Cost_cutting_model extends CI_Model
             ->result();
     }
 
+    public function get_batch_errors($batch_id)
+    {
+        return $this->db->order_by('source_row_number', 'ASC')
+            ->get_where('db_cost_cutting_batch_errors', array('batch_id' => (int) $batch_id))
+            ->result();
+    }
+
+    public function get_blocking_batch_error_count($batch_id)
+    {
+        return (int) $this->db->where(array(
+            'batch_id' => (int) $batch_id,
+            'blocks_processing' => 1,
+        ))->count_all_results('db_cost_cutting_batch_errors');
+    }
+
     public function get_completed_batch_for_customer($payment_period, $customer_number, $exclude_batch_id = 0)
     {
         $this->db->select('b.batch_number')
@@ -164,7 +185,7 @@ class Cost_cutting_model extends CI_Model
         if (!$batch || in_array($batch->status, array('Completed', 'Reverted'), true)) {
             return array('success' => false, 'message' => 'This Cost Cutting batch cannot be processed.');
         }
-        if ((int) $batch->error_records > 0) {
+        if ($this->get_blocking_batch_error_count($batch_id) > 0) {
             return array('success' => false, 'message' => 'Fix all invalid rows before processing this batch.');
         }
 

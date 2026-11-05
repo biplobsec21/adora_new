@@ -32,7 +32,7 @@ After the Opening Balance is created, the first regular Monthly Cycle is generat
 
 ## Cost Cutting upload customer matching
 
-Cost Cutting uploads require a `Cutting Amount` column and either `Customer Number` or `Customer Name`. If a `Customer Name` column is present, its value takes precedence over the number column and must match exactly one active customer after case and whitespace normalization. A leading numeric or numeric-code prefix is also ignored when matching names. Rows with blank, unmatched, or ambiguous names are skipped and reported; repeated names that resolve to the same customer remain validation errors.
+Cost Cutting uploads require a `Cutting Amount` column and either `Customer Number` or `Customer Name`. If a `Customer Name` column is present, its value takes precedence over the number column and must match exactly one active customer after case and whitespace normalization. A leading numeric or numeric-code prefix is also ignored when matching names. Rejected CSV rows are stored in `db_cost_cutting_batch_errors` and displayed separately from processable payment items. Unmatched or ambiguous names do not block processing of uniquely matched rows, while other validation errors do. Repeated names that resolve to the same customer remain validation errors.
 
 ## Billing rules implemented
 

@@ -21,7 +21,7 @@
                 <?php include APPPATH . 'views/comman/code_flashdata.php'; ?>
                 <?php if ($batch->status === 'Completed') { ?>
                     <div class="alert alert-success">Cost Cutting has been processed. Invalid rows were not applied; review their validation messages below.</div>
-                <?php } elseif ((int) $batch->error_records > 0) { ?>
+                <?php } elseif ($blocking_error_count > 0) { ?>
                     <div class="alert alert-warning">Fix the invalid rows before processing. N/A customers are excluded from Cost Cutting and must be handled manually from the customer panel.</div>
                 <?php } else { ?>
                     <div class="alert alert-info">Review is complete. No payment records have been changed.</div>
@@ -71,12 +71,7 @@
                         $total_cutting_amount = 0;
                         $total_due_after_cutting = 0;
                         $valid_items = array();
-                        $invalid_items = array();
                         foreach ($items as $item) {
-                            if ($item->validation_status === 'Invalid') {
-                                $invalid_items[] = $item;
-                                continue;
-                            }
                             $valid_items[] = $item;
                             $total_due_at_upload += (float) $item->due_amount;
                             if ($item->cutting_amount !== null) {
@@ -148,7 +143,7 @@
                         </table>
                     </div>
                     <div class="box-footer">
-                        <?php if ((int) $batch->error_records === 0 && $batch->status !== 'Completed') { ?>
+                        <?php if ($blocking_error_count === 0 && $batch->status !== 'Completed') { ?>
                             <form method="post" action="<?= $base_url; ?>cost_cutting/process/<?= (int) $batch->id; ?>" onsubmit="return confirm('Process this Cost Cutting batch? Overpayments will be capped at the current due amount.');" style="display:inline-block;">
                                 <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
                                 <input type="hidden" name="confirm" value="1">
@@ -158,16 +153,16 @@
                         <a href="<?= $base_url; ?>cost_cutting" class="btn btn-default">Upload Another File</a>
                     </div>
                 </div>
-                <?php if (!empty($invalid_items)) { ?>
+                <?php if (!empty($batch_errors)) { ?>
                     <div class="box box-danger">
                         <div class="box-header with-border">
-                            <h3 class="box-title">Invalid / Not Processed Rows (<?= count($invalid_items); ?>)</h3>
+                            <h3 class="box-title">CSV Rows Not Matched / Processed (<?= count($batch_errors); ?>)</h3>
                         </div>
                         <div class="box-body">
                             <?php if ($batch->status === 'Completed') { ?>
-                                <p>This batch was already processed. These invalid rows were not applied and were not part of the reconciliation.</p>
+                                <p>These CSV rows were stored separately because they failed validation. They were not included in the processed payment items or reconciliation.</p>
                             <?php } else { ?>
-                                <p>These rows were not processed. Fix the customer match or validation issue before uploading them again.</p>
+                                <p>These CSV rows are stored separately and will not be applied. Correct blocking errors before processing; unmatched names can be handled in a later upload.</p>
                             <?php } ?>
                             <div class="table-responsive">
                                 <table class="table table-bordered table-striped">
@@ -182,14 +177,14 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($invalid_items as $item) { ?>
+                                        <?php foreach ($batch_errors as $item) { ?>
                                             <tr class="danger">
                                                 <td><?= (int) $item->source_row_number; ?></td>
                                                 <td><?= html_escape($item->customer_code ?: '-'); ?></td>
                                                 <td><?= html_escape($item->customer_name ?: '-'); ?></td>
                                                 <td><?= $item->cutting_amount === null ? '-' : app_number_format($item->cutting_amount); ?></td>
-                                                <td><?= html_escape($item->validation_error ?: 'Invalid row'); ?></td>
-                                                <td><?= app_number_format($item->new_paid_amount ?? 0); ?></td>
+                                                <td><?= html_escape($item->error_message); ?></td>
+                                                <td>0.00</td>
                                             </tr>
                                         <?php } ?>
                                     </tbody>

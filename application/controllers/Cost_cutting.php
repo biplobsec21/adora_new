@@ -128,6 +128,8 @@ class Cost_cutting extends MY_Controller
                     $errors[] = 'No active customer matched this name.';
                 } elseif ($name_match_count > 1) {
                     $errors[] = 'Customer name matched more than one active customer.';
+                } elseif (!$snapshot) {
+                    $errors[] = 'Matched customer is no longer active.';
                 }
             } elseif ($customer_number === '') {
                 $errors[] = 'Customer Number is required.';
@@ -171,19 +173,40 @@ class Cost_cutting extends MY_Controller
                 $summary['error_records']++;
             }
 
+            if ($error !== '') {
+                $unmatched_name = $columns['name'] !== false
+                    && $customer_name !== ''
+                    && $name_match_count !== 1
+                    && count($errors) === 1;
+                $error_type = 'Validation error';
+                if ($unmatched_name) {
+                    $error_type = $name_match_count > 1 ? 'Ambiguous customer name' : 'Unmatched customer name';
+                }
+                $this->cost_cutting->add_batch_error($batch_id, array(
+                    'source_row_number' => $row_number,
+                    'customer_code' => $columns['name'] === false && $customer_number !== '' ? $customer_number : null,
+                    'customer_name' => $customer_name,
+                    'cutting_amount' => $cutting_amount,
+                    'error_type' => $error_type,
+                    'error_message' => $error,
+                    'blocks_processing' => $unmatched_name ? 0 : 1,
+                ));
+                continue;
+            }
+
             $this->cost_cutting->add_item($batch_id, array(
                 'source_row_number' => $row_number,
-                'customer_id' => $snapshot ? $snapshot['customer_id'] : null,
-                'customer_code' => $snapshot ? $customer_number : ($columns['name'] === false && $customer_number !== '' ? $customer_number : null),
+                'customer_id' => $snapshot['customer_id'],
+                'customer_code' => $customer_number,
                 'customer_name' => $customer_name,
                 'due_amount' => $due_amount,
                 'cutting_amount' => $cutting_amount,
-                'previous_status' => $snapshot ? $snapshot['status'] : null,
-                'previous_paid_amount' => $snapshot ? $snapshot['paid_amount'] : null,
+                'previous_status' => $snapshot['status'],
+                'previous_paid_amount' => $snapshot['paid_amount'],
                 'new_status' => $new_status,
-                'new_paid_amount' => $error === '' ? $cutting_amount : null,
-                'validation_status' => $error === '' ? 'Valid' : 'Invalid',
-                'validation_error' => $error !== '' ? $error : $validation_message,
+                'new_paid_amount' => $cutting_amount,
+                'validation_status' => 'Valid',
+                'validation_error' => $validation_message,
             ));
         }
         fclose($handle);
@@ -204,6 +227,8 @@ class Cost_cutting extends MY_Controller
         $data['page_title'] = 'Review Cost Cutting';
         $data['batch'] = $this->cost_cutting->get_batch($batch_id);
         $data['items'] = $this->cost_cutting->get_items($batch_id);
+        $data['batch_errors'] = $this->cost_cutting->get_batch_errors($batch_id);
+        $data['blocking_error_count'] = $this->cost_cutting->get_blocking_batch_error_count($batch_id);
         if (!$data['batch']) {
             show_404();
         }

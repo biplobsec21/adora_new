@@ -58,3 +58,22 @@ CREATE TABLE IF NOT EXISTS `db_cost_cutting_items` (
     FOREIGN KEY (`batch_id`) REFERENCES `db_cost_cutting_batches` (`id`)
     ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `db_cost_cutting_batch_errors` (
+  `id` int(50) NOT NULL AUTO_INCREMENT,
+  `batch_id` int(50) NOT NULL,
+  `source_row_number` int(10) NOT NULL,
+  `customer_code` varchar(50) DEFAULT NULL,
+  `customer_name` varchar(255) DEFAULT NULL,
+  `cutting_amount` decimal(20,2) DEFAULT NULL,
+  `error_type` varchar(50) NOT NULL,
+  `error_message` varchar(500) NOT NULL,
+  `blocks_processing` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_cost_cutting_batch_error_row` (`batch_id`,`source_row_number`),
+  KEY `idx_cost_cutting_batch_error_blocking` (`batch_id`,`blocks_processing`),
+  CONSTRAINT `fk_cost_cutting_batch_error_batch`
+    FOREIGN KEY (`batch_id`) REFERENCES `db_cost_cutting_batches` (`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
