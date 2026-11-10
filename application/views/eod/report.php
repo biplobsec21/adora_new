@@ -93,6 +93,8 @@
                                     <th>Sales Due</th>
                                     <th>Collected Cash</th>
                                     <th>Expenses</th>
+                                    <th>Customer Deposits</th>
+                                    <th>Deposit Withdrawals</th>
                                     <th>Cash Additions</th>
                                     <th>Cash Deductions</th>
                                     <th>Final Cash</th>
@@ -108,6 +110,8 @@
                                     <th id="total-sales-due"></th>
                                     <th id="total-collected-cash"></th>
                                     <th id="total-expenses"></th>
+                                    <th id="total-customer-deposits"></th>
+                                    <th id="total-customer-deposit-withdrawals"></th>
                                     <th id="total-additions"></th>
                                     <th id="total-deductions"></th>
                                     <th id="total-final-cash"></th>
@@ -142,6 +146,8 @@
                     sales: 0,
                     collected: 0,
                     expenses: 0,
+                    deposits: 0,
+                    withdrawals: 0,
                     additions: 0,
                     deductions: 0,
                     final: 0
@@ -151,6 +157,8 @@
                     totals.sales += Number(row.total_sales_due || 0);
                     totals.collected += Number(row.total_cash_collected || 0);
                     totals.expenses += Number(row.total_expenses || 0);
+                    totals.deposits += Number(row.total_customer_deposits || 0);
+                    totals.withdrawals += Number(row.total_customer_deposit_withdrawals || 0);
                     totals.additions += Number(row.custom_cash_additions || 0);
                     totals.deductions += Number(row.custom_cash_deductions || 0);
                     totals.final += Number(row.final_cash_in_hand || 0);
@@ -161,6 +169,8 @@
                         '<td class="text-right">' + money(row.total_sales_due) + '</td>' +
                         '<td class="text-right">' + money(row.total_cash_collected) + '</td>' +
                         '<td class="text-right">' + money(row.total_expenses) + '</td>' +
+                        '<td class="text-right">' + money(row.total_customer_deposits) + '</td>' +
+                        '<td class="text-right">' + money(row.total_customer_deposit_withdrawals) + '</td>' +
                         '<td class="text-right">' + money(row.custom_cash_additions) + '</td>' +
                         '<td class="text-right">' + money(row.custom_cash_deductions) + '</td>' +
                         '<td class="text-right">' + money(row.final_cash_in_hand) + '</td>' +
@@ -172,6 +182,8 @@
                 $('#total-sales-due').text(money(totals.sales));
                 $('#total-collected-cash').text(money(totals.collected));
                 $('#total-expenses').text(money(totals.expenses));
+                $('#total-customer-deposits').text(money(totals.deposits));
+                $('#total-customer-deposit-withdrawals').text(money(totals.withdrawals));
                 $('#total-additions').text(money(totals.additions));
                 $('#total-deductions').text(money(totals.deductions));
                 $('#total-final-cash').text(money(totals.final));
@@ -215,7 +227,7 @@
                     'table { width: 100%; border-collapse: collapse; font-size: 10px; }' +
                     'th, td { border: 1px solid #777; padding: 5px; text-align: left; }' +
                     'th { background: #e5e5e5; }' +
-                    'td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7), td:nth-child(8), td:nth-child(9), th:nth-child(4), th:nth-child(5), th:nth-child(6), th:nth-child(7), th:nth-child(8), th:nth-child(9) { text-align: right; }' +
+                    'td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(7), td:nth-child(8), td:nth-child(9), td:nth-child(10), td:nth-child(11), th:nth-child(4), th:nth-child(5), th:nth-child(6), th:nth-child(7), th:nth-child(8), th:nth-child(9), th:nth-child(10), th:nth-child(11) { text-align: right; }' +
                     '</style></head><body>' +
                     '<h1>EOD Report</h1><p>Date range: ' + fromDate + ' to ' + toDate + '</p>' +
                     table +

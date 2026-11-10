@@ -243,8 +243,8 @@ $CI = &get_instance();
       <?php } ?>
 
       <!--<li class="header">CUSTOMERS</li>-->
-      <?php if ($CI->permissions('customers_add') || $CI->permissions('customers_view') || $CI->permissions('customers_edit') || $CI->permissions('import_customers') || $CI->permissions('customer_loan_view') || $CI->permissions('customer_loan_add') || $CI->permissions('customer_loan_edit') || $CI->permissions('customer_loan_repayment') || $CI->permissions('customer_refunds_view')) { ?>
-        <li class="customers-view-active-li customers-active-li import_customers-active-li customer-number-migration-active-li customer-refunds-active-li treeview">
+      <?php if ($CI->permissions('customers_add') || $CI->permissions('customers_view') || $CI->permissions('customers_edit') || $CI->permissions('import_customers') || $CI->permissions('customer_loan_view') || $CI->permissions('customer_loan_add') || $CI->permissions('customer_loan_edit') || $CI->permissions('customer_loan_repayment') || $CI->permissions('customer_deposit_view') || $CI->permissions('customer_deposit_add') || $CI->permissions('customer_deposit_withdraw') || $CI->permissions('customer_refunds_view')) { ?>
+        <li class="customers-view-active-li customers-active-li import_customers-active-li customer-number-migration-active-li customer-refunds-active-li customer-deposit-management-active-li treeview">
           <a href="#">
             <i class="fa fa-group text-aqua"></i> <span><?= $this->lang->line('customers'); ?></span>
             <span class="pull-right-container">
@@ -263,6 +263,9 @@ $CI = &get_instance();
             <?php } ?>
             <?php if ($CI->permissions('customer_loan_view') || $CI->permissions('customer_loan_add') || $CI->permissions('customer_loan_repayment')) { ?>
               <li class="customer-loan-management-active-li"><a href="<?php echo $base_url; ?>customer_loan_management"><i class="fa fa-money text-green"></i> <span>Customer Loan Management</span></a></li>
+            <?php } ?>
+            <?php if ($CI->permissions('customer_deposit_view') || $CI->permissions('customer_deposit_add') || $CI->permissions('customer_deposit_withdraw')) { ?>
+              <li class="customer-deposit-management-active-li"><a href="<?php echo $base_url; ?>customer_deposit_management"><i class="fa fa-credit-card text-green"></i> <span>Customer Deposit Management</span></a></li>
             <?php } ?>
 
             <?php if ($CI->permissions('import_customers')) { ?>
@@ -636,6 +639,9 @@ $CI = &get_instance();
 
       if (/\/customer_loan_management(?:\/|$)/.test(path)) {
         activeClass = 'customer-loan-management-active-li';
+        parentClass = 'customers-view-active-li';
+      } else if (/\/customer_deposit_management(?:\/|$)/.test(path)) {
+        activeClass = 'customer-deposit-management-active-li';
         parentClass = 'customers-view-active-li';
       } else if (/\/payment_management(?:\/|$)/.test(path)) {
         activeClass = 'payment-management-active-li';

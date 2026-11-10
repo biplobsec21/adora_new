@@ -44,7 +44,7 @@
 
                 <?php if (!empty($late_entry)) { ?>
                     <div class="callout callout-warning">
-                        <h4><i class="fa fa-clock-o"></i> Late entry detected for <?= html_escape($late_entry['previous_date']); ?></h4>
+                        <h4><i class="fa fa-clock-o"></i> Late cash activity detected for <?= html_escape($late_entry['previous_date']); ?></h4>
                         <p>New activity has been recorded after <?= html_escape($late_entry['previous_date']); ?> was already closed. The stored EOD snapshot is now out of sync.</p>
                         <ul>
                             <?php foreach ($late_entry['mismatch_details'] as $detail) { ?>
@@ -124,6 +124,8 @@
                         array('label' => 'Purchase Payments', 'value' => $summary['total_purchase_paid'], 'class' => 'bg-red', 'icon' => 'fa-shopping-cart', 'detail_type' => 'purchase_payments'),
                         array('label' => 'Loan Given', 'value' => $summary['total_loan_given'], 'class' => 'bg-orange', 'icon' => 'fa-credit-card', 'detail_type' => 'loan_given'),
                         array('label' => 'Loan Repayments', 'value' => $summary['total_loan_repayments_received'], 'class' => 'bg-purple', 'icon' => 'fa-refresh', 'detail_type' => 'loan_repayments'),
+                        array('label' => 'Customer Deposits', 'value' => $summary['total_customer_deposits'], 'class' => 'bg-green', 'icon' => 'fa-plus-circle', 'detail_type' => 'customer_deposits'),
+                        array('label' => 'Deposit Withdrawals', 'value' => $summary['total_customer_deposit_withdrawals'], 'class' => 'bg-yellow', 'icon' => 'fa-minus-circle', 'detail_type' => 'customer_deposit_withdrawals'),
                         array('label' => 'Expenses', 'value' => $summary['total_expenses'], 'class' => 'bg-red', 'icon' => 'fa-minus-circle', 'detail_type' => 'expenses'),
                         array('label' => 'Final Cash In Hand', 'value' => $summary['final_cash_in_hand'], 'class' => 'bg-aqua', 'icon' => 'fa-calculator', 'detail_type' => null),
                     );
@@ -222,12 +224,12 @@
                                         <?= form_open('eod/close_day'); ?>
                                         <input type="hidden" name="closing_date" value="<?= html_escape($summary['closing_date']); ?>">
                                         <p>Save the displayed totals as the permanent EOD snapshot for <?= html_escape($summary['closing_date']); ?>.</p>
-                                        <?php if (!empty($late_collected_cash) && (float) $late_collected_cash['late_amount'] > 0) { ?>
+                                        <?php if (!empty($late_collected_cash) && !empty($late_collected_cash['has_late_activity'])) { ?>
                                             <div class="alert alert-info" style="margin-top: 10px; margin-bottom: 10px; padding: 10px 15px;">
-                                                <strong>Late collected cash for <?= html_escape($late_collected_cash['previous_date']); ?>:</strong>
+                                                <strong>Net late cash impact for <?= html_escape($late_collected_cash['previous_date']); ?>:</strong>
                                                 <?= $CI->currency(number_format((float) $late_collected_cash['late_amount'], 2, '.', '')); ?>
                                                 <br>
-                                                This amount belongs to <?= html_escape($late_collected_cash['previous_date']); ?> and will be reflected in that day’s EOD snapshot.
+                                                This activity belongs to <?= html_escape($late_collected_cash['previous_date']); ?> and will be reflected in that day’s EOD snapshot.
                                             </div>
                                         <?php } ?>
                                         <button type="submit" class="btn btn-success" onclick="return confirm('Close this date? This action cannot be undone from this screen.');"><i class="fa fa-lock"></i> Close Day</button>
@@ -437,6 +439,15 @@
                     columns = [
                         ['transaction_date', 'Date'],
                         ['loan_id', 'Loan ID'],
+                        ['payment_method', 'Payment Method'],
+                        ['amount', 'Amount'],
+                        ['note', 'Note'],
+                        ['created_by', 'Created By']
+                    ];
+                } else if (response.type === 'customer_deposits' || response.type === 'customer_deposit_withdrawals') {
+                    columns = [
+                        ['transaction_date', 'Date'],
+                        ['customer_name', 'Customer'],
                         ['payment_method', 'Payment Method'],
                         ['amount', 'Amount'],
                         ['note', 'Note'],

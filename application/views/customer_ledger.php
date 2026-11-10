@@ -361,6 +361,14 @@
                                                     <span class="credit-amount">৳ <?= number_format($account_summary['total_loan_repaid'], 2); ?></span>
                                                 </div>
                                                 <div class="summary-item-merged">
+                                                    <span>Customer Deposits</span>
+                                                    <span class="credit-amount">৳ <?= number_format($account_summary['total_customer_deposits'], 2); ?></span>
+                                                </div>
+                                                <div class="summary-item-merged">
+                                                    <span>Deposit Withdrawals</span>
+                                                    <span class="debit-amount">৳ <?= number_format($account_summary['total_customer_deposit_withdrawals'], 2); ?></span>
+                                                </div>
+                                                <div class="summary-item-merged">
                                                     <span>Total Received</span>
                                                     <span class="credit-amount">৳ <?= number_format($account_summary['total_paid'], 2); ?></span>
                                                 </div>
@@ -444,6 +452,8 @@
                                         <?= $transaction->type == 'Return Payment' ? 'label-primary' : ''; ?>
                                         <?= $transaction->type == 'Customer Loan' ? 'label-primary' : ''; ?>
                                         <?= $transaction->type == 'Loan Repayment' ? 'label-success' : ''; ?>
+                                        <?= $transaction->type == 'Customer Deposit' ? 'label-info' : ''; ?>
+                                        <?= $transaction->type == 'Deposit Withdrawal' ? 'label-warning' : ''; ?>
                                     ">
                                                                     <?= $transaction->type; ?>
                                                                 </span>

@@ -14,6 +14,8 @@ class Eod_model extends CI_Model
             'total_purchase_paid' => 0,
             'total_loan_given' => 0,
             'total_loan_repayments_received' => 0,
+            'total_customer_deposits' => 0,
+            'total_customer_deposit_withdrawals' => 0,
             'total_expenses' => 0,
             'custom_cash_additions' => 0,
             'custom_cash_deductions' => 0,
@@ -37,6 +39,8 @@ class Eod_model extends CI_Model
             $summary['total_purchase_paid'] = (float) $closing->total_purchase_paid;
             $summary['total_loan_given'] = (float) $closing->total_loan_given;
             $summary['total_loan_repayments_received'] = (float) $closing->total_loan_repayments_received;
+            $summary['total_customer_deposits'] = (float) $closing->total_customer_deposits;
+            $summary['total_customer_deposit_withdrawals'] = (float) $closing->total_customer_deposit_withdrawals;
             $summary['total_expenses'] = (float) $closing->total_expenses;
             $summary['custom_cash_additions'] = (float) $closing->custom_cash_additions;
             $summary['custom_cash_deductions'] = (float) $closing->custom_cash_deductions;
@@ -62,6 +66,8 @@ class Eod_model extends CI_Model
                     c.total_purchase_paid,
                     c.total_loan_given,
                     c.total_loan_repayments_received,
+                    c.total_customer_deposits,
+                    c.total_customer_deposit_withdrawals,
                     c.total_expenses,
                     c.custom_cash_additions,
                     c.custom_cash_deductions,
@@ -164,6 +170,21 @@ class Eod_model extends CI_Model
                          FROM {$from}
                          WHERE {$where}
                          ORDER BY id DESC
+                         LIMIT {$per_page} OFFSET {$offset}";
+        } elseif ($type === 'customer_deposits' || $type === 'customer_deposit_withdrawals') {
+            $transaction_type = $type === 'customer_deposits' ? 'DEPOSIT' : 'WITHDRAWAL';
+            $from = 'db_customer_deposit_transactions AS d
+                     LEFT JOIN db_customers AS c ON c.id = d.customer_id';
+            $where = 'd.transaction_date = ? AND d.transaction_type = ?';
+            $params = array($closing_date, $transaction_type);
+            $count_sql = "SELECT COUNT(*) AS total FROM {$from} WHERE {$where}";
+            $total_sql = "SELECT COALESCE(SUM(d.amount), 0) AS total_amount FROM {$from} WHERE {$where}";
+            $data_sql = "SELECT d.id, d.customer_id, c.customer_name,
+                                d.transaction_date, d.transaction_type, d.payment_method,
+                                d.amount, d.note, d.created_by
+                         FROM {$from}
+                         WHERE {$where}
+                         ORDER BY d.id DESC
                          LIMIT {$per_page} OFFSET {$offset}";
         } elseif ($type === 'sales_due') {
             $from = 'db_sales';
@@ -354,6 +375,10 @@ class Eod_model extends CI_Model
                 FROM db_customer_loan_transactions
                 WHERE transaction_date < ?
                 UNION
+                SELECT transaction_date AS activity_date
+                FROM db_customer_deposit_transactions
+                WHERE transaction_date < ?
+                UNION
                 SELECT DATE(paid_at) AS activity_date
                 FROM db_due_generation_refunds
                 WHERE status = 'Paid' AND DATE(paid_at) < ?
@@ -361,7 +386,7 @@ class Eod_model extends CI_Model
              LEFT JOIN db_daily_closing AS closing ON closing.closing_date = activity_dates.activity_date
                          WHERE closing.id IS NULL
                              AND activity_dates.activity_date >= ?",
-            array($current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $start_date)
+            array($current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $current_date, $start_date)
         )->row();
 
         return $query ? $query->pending_date : null;
@@ -373,6 +398,7 @@ class Eod_model extends CI_Model
             return array(
                 'previous_date' => null,
                 'late_amount' => 0,
+                'has_late_activity' => false,
                 'saved_total_cash_collected' => 0,
                 'live_total_cash_collected' => 0,
             );
@@ -385,6 +411,7 @@ class Eod_model extends CI_Model
             return array(
                 'previous_date' => $previous_date,
                 'late_amount' => 0,
+                'has_late_activity' => false,
                 'saved_total_cash_collected' => 0,
                 'live_total_cash_collected' => 0,
             );
@@ -392,11 +419,18 @@ class Eod_model extends CI_Model
 
         $saved_total_cash_collected = (float) $previous_closing->total_cash_collected;
         $live_total_cash_collected = $this->get_total_cash_collected($previous_date);
-        $late_amount = max(0, $live_total_cash_collected - $saved_total_cash_collected);
+        $live_summary = $this->get_live_summary($previous_date);
+        $has_late_activity = round($live_total_cash_collected, 2) !== round($saved_total_cash_collected, 2)
+            || round((float) $live_summary['total_customer_deposits'], 2) !== round((float) $previous_closing->total_customer_deposits, 2)
+            || round((float) $live_summary['total_customer_deposit_withdrawals'], 2) !== round((float) $previous_closing->total_customer_deposit_withdrawals, 2);
+        $late_amount = max(0, $live_total_cash_collected - $saved_total_cash_collected)
+            + ((float) $live_summary['total_customer_deposits'] - (float) $previous_closing->total_customer_deposits)
+            - ((float) $live_summary['total_customer_deposit_withdrawals'] - (float) $previous_closing->total_customer_deposit_withdrawals);
 
         return array(
             'previous_date' => $previous_date,
             'late_amount' => $late_amount,
+            'has_late_activity' => $has_late_activity,
             'saved_total_cash_collected' => $saved_total_cash_collected,
             'live_total_cash_collected' => $live_total_cash_collected,
         );
@@ -432,6 +466,8 @@ class Eod_model extends CI_Model
             'total_purchase_paid' => (float) $closing->total_purchase_paid,
             'total_loan_given' => (float) $closing->total_loan_given,
             'total_loan_repayments_received' => (float) $closing->total_loan_repayments_received,
+            'total_customer_deposits' => (float) $closing->total_customer_deposits,
+            'total_customer_deposit_withdrawals' => (float) $closing->total_customer_deposit_withdrawals,
             'total_expenses' => (float) $closing->total_expenses,
             'custom_cash_additions' => (float) $closing->custom_cash_additions,
             'custom_cash_deductions' => (float) $closing->custom_cash_deductions,
@@ -475,7 +511,7 @@ class Eod_model extends CI_Model
         $previous_date = $late_entry_info['previous_date'];
         $late_entry_amount = (float) $late_entry_info['late_amount'];
 
-        if ($previous_date && $late_entry_amount > 0) {
+        if ($previous_date && $late_entry_info['has_late_activity']) {
             $previous_closing = $this->db->get_where('db_daily_closing', array('closing_date' => $previous_date))->row();
             if ($previous_closing) {
                 $previous_summary = $this->get_live_summary($previous_date);
@@ -487,6 +523,8 @@ class Eod_model extends CI_Model
                     'total_purchase_paid' => (float) $previous_summary['total_purchase_paid'],
                     'total_loan_given' => (float) $previous_summary['total_loan_given'],
                     'total_loan_repayments_received' => (float) $previous_summary['total_loan_repayments_received'],
+                    'total_customer_deposits' => (float) $previous_summary['total_customer_deposits'],
+                    'total_customer_deposit_withdrawals' => (float) $previous_summary['total_customer_deposit_withdrawals'],
                     'total_expenses' => (float) $previous_summary['total_expenses'],
                     'custom_cash_additions' => (float) $previous_summary['custom_cash_additions'],
                     'custom_cash_deductions' => (float) $previous_summary['custom_cash_deductions'],
@@ -506,6 +544,8 @@ class Eod_model extends CI_Model
             'total_purchase_paid' => (float) $summary['total_purchase_paid'],
             'total_loan_given' => (float) $summary['total_loan_given'],
             'total_loan_repayments_received' => (float) $summary['total_loan_repayments_received'],
+            'total_customer_deposits' => (float) $summary['total_customer_deposits'],
+            'total_customer_deposit_withdrawals' => (float) $summary['total_customer_deposit_withdrawals'],
             'total_expenses' => (float) $summary['total_expenses'],
             'custom_cash_additions' => (float) $summary['custom_cash_additions'],
             'custom_cash_deductions' => (float) $summary['custom_cash_deductions'],
@@ -545,6 +585,8 @@ class Eod_model extends CI_Model
             'total_purchase_paid' => (float) $summary['total_purchase_paid'],
             'total_loan_given' => (float) $summary['total_loan_given'],
             'total_loan_repayments_received' => (float) $summary['total_loan_repayments_received'],
+            'total_customer_deposits' => (float) $summary['total_customer_deposits'],
+            'total_customer_deposit_withdrawals' => (float) $summary['total_customer_deposit_withdrawals'],
             'total_expenses' => (float) $summary['total_expenses'],
             'custom_cash_additions' => (float) $summary['custom_cash_additions'],
             'custom_cash_deductions' => (float) $summary['custom_cash_deductions'],
@@ -580,6 +622,8 @@ class Eod_model extends CI_Model
             'total_purchase_paid' => 0,
             'total_loan_given' => 0,
             'total_loan_repayments_received' => 0,
+            'total_customer_deposits' => 0,
+            'total_customer_deposit_withdrawals' => 0,
             'total_expenses' => 0,
             'custom_cash_additions' => 0,
             'custom_cash_deductions' => 0,
@@ -628,6 +672,17 @@ class Eod_model extends CI_Model
         )->row();
         $summary['total_loan_repayments_received'] = (float) $loan_repayments->total_loan_repayments_received;
 
+        $customer_deposits = $this->db->query(
+            "SELECT
+                COALESCE(SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE 0 END), 0) AS total_customer_deposits,
+                COALESCE(SUM(CASE WHEN transaction_type = 'WITHDRAWAL' THEN amount ELSE 0 END), 0) AS total_customer_deposit_withdrawals
+             FROM db_customer_deposit_transactions
+             WHERE transaction_date = ?",
+            array($closing_date)
+        )->row();
+        $summary['total_customer_deposits'] = (float) $customer_deposits->total_customer_deposits;
+        $summary['total_customer_deposit_withdrawals'] = (float) $customer_deposits->total_customer_deposit_withdrawals;
+
         $expenses = $this->db->query(
             "SELECT
                 (SELECT COALESCE(SUM(expense_amt), 0)
@@ -656,8 +711,10 @@ class Eod_model extends CI_Model
         $summary['final_cash_in_hand'] = $summary['opening_cash']
             + $summary['total_cash_collected']
             + $summary['total_loan_repayments_received']
+            + $summary['total_customer_deposits']
             - $summary['total_purchase_paid']
             - $summary['total_loan_given']
+            - $summary['total_customer_deposit_withdrawals']
             - $summary['total_expenses']
             + $summary['custom_cash_additions']
             - $summary['custom_cash_deductions'];
@@ -733,6 +790,8 @@ class Eod_model extends CI_Model
             'total_purchase_paid' => (float) $summary['total_purchase_paid'],
             'total_loan_given' => (float) $summary['total_loan_given'],
             'total_loan_repayments_received' => (float) $summary['total_loan_repayments_received'],
+            'total_customer_deposits' => (float) $summary['total_customer_deposits'],
+            'total_customer_deposit_withdrawals' => (float) $summary['total_customer_deposit_withdrawals'],
             'total_expenses' => (float) $summary['total_expenses'],
             'custom_cash_additions' => (float) $summary['custom_cash_additions'],
             'custom_cash_deductions' => (float) $summary['custom_cash_deductions'],

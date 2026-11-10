@@ -21,3 +21,7 @@ ALTER TABLE `db_cash_adjustments`
 ALTER TABLE `db_audit_logs`
   ADD COLUMN `created_date` DATE NULL AFTER `system_ip`,
   ADD COLUMN `created_time` VARCHAR(50) NULL AFTER `created_date`;
+
+ALTER TABLE `db_daily_closing`
+  ADD COLUMN IF NOT EXISTS `total_customer_deposits` DECIMAL(20,2) NOT NULL DEFAULT 0.00 AFTER `total_loan_repayments_received`,
+  ADD COLUMN IF NOT EXISTS `total_customer_deposit_withdrawals` DECIMAL(20,2) NOT NULL DEFAULT 0.00 AFTER `total_customer_deposits`;

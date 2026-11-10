@@ -201,6 +201,8 @@ CREATE TABLE IF NOT EXISTS `db_daily_closing` (
   `total_purchase_paid` decimal(20,2) NOT NULL DEFAULT 0.00,
   `total_loan_given` decimal(20,2) NOT NULL DEFAULT 0.00,
   `total_loan_repayments_received` decimal(20,2) NOT NULL DEFAULT 0.00,
+  `total_customer_deposits` decimal(20,2) NOT NULL DEFAULT 0.00,
+  `total_customer_deposit_withdrawals` decimal(20,2) NOT NULL DEFAULT 0.00,
   `total_expenses` decimal(20,2) NOT NULL DEFAULT 0.00,
   `custom_cash_additions` decimal(20,2) NOT NULL DEFAULT 0.00,
   `custom_cash_deductions` decimal(20,2) NOT NULL DEFAULT 0.00,
@@ -266,6 +268,9 @@ ALTER TABLE `db_daily_closing`
   ADD COLUMN IF NOT EXISTS `total_purchase_paid` DECIMAL(20,2) NOT NULL DEFAULT 0.00 AFTER `total_cash_collected`,
   ADD COLUMN IF NOT EXISTS `total_loan_given` DECIMAL(20,2) NOT NULL DEFAULT 0.00 AFTER `total_purchase_paid`,
   ADD COLUMN IF NOT EXISTS `total_loan_repayments_received` DECIMAL(20,2) NOT NULL DEFAULT 0.00 AFTER `total_loan_given`;
+ALTER TABLE `db_daily_closing`
+  ADD COLUMN IF NOT EXISTS `total_customer_deposits` DECIMAL(20,2) NOT NULL DEFAULT 0.00 AFTER `total_loan_repayments_received`,
+  ADD COLUMN IF NOT EXISTS `total_customer_deposit_withdrawals` DECIMAL(20,2) NOT NULL DEFAULT 0.00 AFTER `total_customer_deposits`;
 
 ALTER TABLE `db_daily_closing`
   ADD COLUMN IF NOT EXISTS `created_date` DATE NULL AFTER `system_ip`,
@@ -443,6 +448,25 @@ CREATE TABLE IF NOT EXISTS `db_customer_loan_transactions` (
   KEY `idx_customer_loan_transactions_loan` (`loan_id`),
   KEY `idx_customer_loan_transactions_customer` (`customer_id`),
   KEY `idx_customer_loan_transactions_date` (`transaction_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `db_customer_deposit_transactions` (
+  `id` int(50) NOT NULL AUTO_INCREMENT,
+  `customer_id` int(50) NOT NULL,
+  `transaction_type` enum('DEPOSIT','WITHDRAWAL') NOT NULL,
+  `amount` decimal(20,2) NOT NULL,
+  `transaction_date` date NOT NULL,
+  `payment_method` varchar(50) DEFAULT NULL,
+  `note` text DEFAULT NULL,
+  `created_by` int(11) NOT NULL DEFAULT 0,
+  `created_date` date DEFAULT NULL,
+  `created_time` varchar(50) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_customer_deposit_transactions_customer` (`customer_id`),
+  KEY `idx_customer_deposit_transactions_date` (`transaction_date`),
+  KEY `idx_customer_deposit_transactions_type_date` (`transaction_type`,`transaction_date`),
+  KEY `idx_customer_deposit_transactions_customer_date` (`customer_id`,`transaction_date`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Cost Cutting row errors are stored separately from processable payment items.

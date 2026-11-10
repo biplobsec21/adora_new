@@ -104,10 +104,22 @@ class Customer_ledger_model extends CI_Model
             $all_transactions[] = $loan_transaction;
         }
 
+        $deposit_transactions = $this->get_deposit_transactions($customer_id, $db_start_date, $db_end_date);
+        foreach ($deposit_transactions as $deposit_transaction) {
+            $deposit_transaction->type = $deposit_transaction->transaction_type === 'WITHDRAWAL' ? 'Deposit Withdrawal' : 'Customer Deposit';
+            $deposit_transaction->is_opening = false;
+            $all_transactions[] = $deposit_transaction;
+        }
+
         // Replace the usort function with this more precise version:
         usort($all_transactions, function ($a, $b) {
             $timeA = strtotime($a->date);
             $timeB = strtotime($b->date);
+
+            $deposit_types = ['Customer Deposit', 'Deposit Withdrawal'];
+            if ($timeA === $timeB && in_array($a->type, $deposit_types, true) && in_array($b->type, $deposit_types, true)) {
+                return (int) $a->id <=> (int) $b->id;
+            }
 
             // If dates are equal, sort by type to ensure consistent order
             if ($timeA === $timeB) {
@@ -119,7 +131,9 @@ class Customer_ledger_model extends CI_Model
                     'Return Payment' => 4,
                     'Opening Balance Payment' => 5,
                     'Customer Loan' => 6,
-                    'Loan Repayment' => 7
+                    'Loan Repayment' => 7,
+                    'Customer Deposit' => 8,
+                    'Deposit Withdrawal' => 9
                 ];
                 return ($typeOrder[$a->type] ?? 999) - ($typeOrder[$b->type] ?? 999);
             }
@@ -150,6 +164,12 @@ class Customer_ledger_model extends CI_Model
                     break;
                 case 'Loan Repayment':
                     $running_balance -= $transaction->amount;
+                    break;
+                case 'Customer Deposit':
+                    $running_balance -= $transaction->amount;
+                    break;
+                case 'Deposit Withdrawal':
+                    $running_balance += $transaction->amount;
                     break;
             }
 
@@ -225,6 +245,12 @@ class Customer_ledger_model extends CI_Model
         $this->db->where('transaction_date <', $start_date);
         $loan_balance = $this->db->get()->row();
         $balance += (float) $loan_balance->total_loan_issues - (float) $loan_balance->total_loan_repayments;
+
+        $deposit_balance = $this->db->select('COALESCE(SUM(CASE WHEN transaction_type = "DEPOSIT" THEN amount WHEN transaction_type = "WITHDRAWAL" THEN -amount ELSE 0 END), 0) AS balance', false)
+            ->where('customer_id', (int) $customer_id)
+            ->where('transaction_date <', $start_date)
+            ->get('db_customer_deposit_transactions')->row();
+        $balance -= (float) $deposit_balance->balance;
 
         return $balance;
     }
@@ -464,6 +490,33 @@ class Customer_ledger_model extends CI_Model
         return $transactions;
     }
 
+    private function get_deposit_transactions($customer_id, $start_date, $end_date)
+    {
+        $this->db->select('id, transaction_type, transaction_date AS date, amount,
+                           payment_method, note AS others,
+                           CONCAT("CD", YEAR(transaction_date), "/", id) AS reference_no');
+        $this->db->from('db_customer_deposit_transactions');
+        $this->db->where('customer_id', $customer_id);
+        $this->db->where('transaction_date >=', $start_date);
+        $this->db->where('transaction_date <=', $end_date);
+        $this->db->where('amount >', 0);
+        $this->db->order_by('transaction_date', 'ASC');
+
+        $transactions = $this->db->get()->result();
+        foreach ($transactions as $transaction) {
+            $transaction->debit = $transaction->transaction_type === 'WITHDRAWAL' ? $transaction->amount : 0;
+            $transaction->credit = $transaction->transaction_type === 'DEPOSIT' ? $transaction->amount : 0;
+            $transaction->location = '';
+            $transaction->payment_status = 'Paid';
+            $transaction->items = array();
+            if (empty($transaction->others)) {
+                $transaction->others = $transaction->transaction_type === 'DEPOSIT' ? 'Customer deposit' : 'Customer deposit withdrawal';
+            }
+        }
+
+        return $transactions;
+    }
+
     // Get account summary
     public function get_account_summary($customer_id, $start_date, $end_date)
     {
@@ -477,6 +530,8 @@ class Customer_ledger_model extends CI_Model
             'total_cob_payments' => 0,
             'total_loan_issued' => 0,
             'total_loan_repaid' => 0,
+            'total_customer_deposits' => 0,
+            'total_customer_deposit_withdrawals' => 0,
             'advance_balance' => 0,
             'balance_due' => 0
         );
@@ -525,8 +580,17 @@ class Customer_ledger_model extends CI_Model
         $summary['total_loan_issued'] = (float) $loan_result->total_loan_issued;
         $summary['total_loan_repaid'] = (float) $loan_result->total_loan_repaid;
 
+        $deposit_result = $this->db->select('COALESCE(SUM(CASE WHEN transaction_type = "DEPOSIT" THEN amount ELSE 0 END), 0) AS total_customer_deposits,
+                COALESCE(SUM(CASE WHEN transaction_type = "WITHDRAWAL" THEN amount ELSE 0 END), 0) AS total_customer_deposit_withdrawals', false)
+            ->where('customer_id', (int) $customer_id)
+            ->where('transaction_date >=', $db_start_date)
+            ->where('transaction_date <=', $db_end_date)
+            ->get('db_customer_deposit_transactions')->row();
+        $summary['total_customer_deposits'] = (float) $deposit_result->total_customer_deposits;
+        $summary['total_customer_deposit_withdrawals'] = (float) $deposit_result->total_customer_deposit_withdrawals;
+
         // Balance due (including COB payments)
-        $summary['balance_due'] = $summary['opening_balance'] + $summary['total_invoice'] + $summary['total_loan_issued'] - $summary['total_paid'] - $summary['total_cob_payments'] - $summary['total_loan_repaid'];
+        $summary['balance_due'] = $summary['opening_balance'] + $summary['total_invoice'] + $summary['total_loan_issued'] + $summary['total_customer_deposit_withdrawals'] - $summary['total_paid'] - $summary['total_cob_payments'] - $summary['total_loan_repaid'] - $summary['total_customer_deposits'];
 
         return $summary;
     }

@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS `db_daily_closing` (
   `total_purchase_paid` decimal(20,2) NOT NULL DEFAULT 0.00,
   `total_loan_given` decimal(20,2) NOT NULL DEFAULT 0.00,
   `total_loan_repayments_received` decimal(20,2) NOT NULL DEFAULT 0.00,
+  `total_customer_deposits` decimal(20,2) NOT NULL DEFAULT 0.00,
+  `total_customer_deposit_withdrawals` decimal(20,2) NOT NULL DEFAULT 0.00,
   `total_expenses` decimal(20,2) NOT NULL DEFAULT 0.00,
   `custom_cash_additions` decimal(20,2) NOT NULL DEFAULT 0.00,
   `custom_cash_deductions` decimal(20,2) NOT NULL DEFAULT 0.00,
